@@ -6,11 +6,6 @@ import { z } from 'zod'
 
 const createPartnershipSchema = z.object({
   receiverEmail: z.string().email(),
-  habitName: z.string().min(1),
-  habitCategory: z.string().optional(),
-  frequency: z.enum(['DAILY', 'WEEKDAYS', 'CUSTOM']).default('DAILY'),
-  customDays: z.array(z.number()).optional(),
-  duration: z.number().optional(),
 })
 
 export async function GET() {
@@ -34,12 +29,17 @@ export async function GET() {
         receiver: {
           select: { id: true, name: true, email: true, image: true },
         },
-        challenges: {
+        habits: {
           orderBy: { createdAt: 'desc' },
-          take: 5,
           include: {
-            completions: {
-              where: { userId: session.user.id },
+            challenges: {
+              take: 3,
+              orderBy: { createdAt: 'desc' },
+              include: {
+                completions: {
+                  where: { userId: session.user.id },
+                },
+              },
             },
           },
         },
@@ -95,12 +95,6 @@ export async function POST(request: NextRequest) {
       data: {
         initiatorId: session.user.id,
         receiverId: receiver.id,
-        habitName: data.habitName,
-        habitCategory: data.habitCategory,
-        frequency: data.frequency,
-        customDays: data.customDays ? JSON.stringify(data.customDays) : null,
-        duration: data.duration,
-        currentTurn: session.user.id, // Initiator sets first goal
       },
       include: {
         initiator: {

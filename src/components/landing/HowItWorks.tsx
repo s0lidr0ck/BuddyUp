@@ -2,29 +2,29 @@ import { CheckCircleIcon } from '@heroicons/react/24/solid'
 
 const steps = [
   {
-    name: 'Sign Up & Connect',
-    description: 'Create your account and invite a friend, or start solo until you find your accountability buddy.',
-    features: ['Fast email sign-up', 'Username or link invites', 'Start immediately'],
+    name: 'Sign Up & Find Your Buddy',
+    description: 'Create your account and invite a friend, or start on your own until you find the perfect habit buddy.',
+    features: ['Super quick sign-up', 'Invite by email or link', 'Start right away'],
   },
   {
-    name: 'Choose Your Habit',
-    description: 'Pick what matters to you - reading, working out, journaling, or any habit you want to build.',
-    features: ['Flexible scheduling', 'Daily or weekday options', 'Custom duration settings'],
+    name: 'Pick What You Want to Work On',
+    description: 'Choose any habit that matters to you - reading, exercise, journaling, or whatever you want to stick to.',
+    features: ['Any habit works', 'Daily or weekdays', 'Set your own timeline'],
   },
   {
-    name: 'Take Turns Setting Goals',
-    description: 'The person who just completed their task sets tomorrow\'s micro-goal for both of you.',
-    features: ['Keep it fresh and fair', 'Micro-goals stay doable', 'Pass option available'],
+    name: 'Take Turns Making It Fun',
+    description: 'Whoever just crushed their goal gets to set tomorrow\'s challenge. Keep it small, keep it doable.',
+    features: ['Switch who\'s in charge', 'Small goals work best', 'Skip a turn if you need to'],
   },
   {
-    name: 'Check In Daily',
-    description: 'Mark it done, tag how you felt, and add a quick reflection note to track your journey.',
-    features: ['15 feeling tags', 'Rotating reflection prompts', 'Progress tracking'],
+    name: 'Check In and Celebrate',
+    description: 'Mark it done, share how you felt, and add a quick note about your experience.',
+    features: ['Quick feeling check-in', 'Optional reflection notes', 'See your progress grow'],
   },
   {
-    name: 'Celebrate & Grow',
-    description: 'Watch your streaks build, earn badges, and create memories on your shared journey.',
-    features: ['Streak counters', 'Achievement badges', 'Memory Wall timeline'],
+    name: 'Build Your Success Story',
+    description: 'Watch your streaks grow, unlock fun achievements, and create an awesome record of your journey together.',
+    features: ['Cool streak counters', 'Achievement unlocks', 'Your shared memory timeline'],
   },
 ]
 
@@ -34,10 +34,10 @@ export function HowItWorks() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            How BuddyUp Works
+            Here's how the buddy system works
           </h2>
           <p className="mt-4 text-lg text-gray-600">
-            Five simple steps to turn good intentions into lasting habits
+            Five simple steps to finally stick to the habits you actually care about
           </p>
         </div>
         

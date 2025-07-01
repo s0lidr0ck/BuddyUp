@@ -9,33 +9,33 @@ import {
 
 const features = [
   {
-    name: 'One-to-One Accountability',
-    description: 'Pair up with one trusted friend for crystal-clear responsibility and genuine encouragement.',
+    name: 'Just You and Your Buddy',
+    description: 'Team up with one person you trust. Simple, personal, and way more effective than going solo.',
     icon: UserGroupIcon,
   },
   {
-    name: 'Turn-Based Goal Setting',
-    description: 'Take turns setting tomorrow\'s micro-goals to keep things fresh and fair.',
+    name: 'Take Turns Setting Goals',
+    description: 'You set a goal for your buddy today, they set one for you tomorrow. Keeps things fair and fun.',
     icon: CalendarDaysIcon,
   },
   {
-    name: 'Streaks & Badges',
-    description: 'Watch your progress grow with streak counters, celebration moments, and achievement badges.',
+    name: 'Celebrate Your Wins',
+    description: 'Track your streaks, earn fun badges, and see how far you\'ve come together.',
     icon: TrophyIcon,
   },
   {
-    name: 'Buddy Chat',
-    description: 'Stay connected with lightweight chat and one-tap encouragement stickers.',
+    name: 'Quick Check-ins',
+    description: 'Simple chat to share progress, send encouragement, and celebrate the little victories.',
     icon: ChatBubbleLeftRightIcon,
   },
   {
-    name: 'Grace-Filled Motivation',
-    description: 'Mulligans, flex days, and reflection prompts balance challenge with encouragement.',
+    name: 'No Pressure Zone',
+    description: 'Life happens! Flex days and second chances keep things supportive, not stressful.',
     icon: HeartIcon,
   },
   {
-    name: 'Memory Wall',
-    description: 'Completed challenges live forever on your Memory Wall for inspiration and reminiscing.',
+    name: 'Your Success Story',
+    description: 'Every completed goal becomes part of your shared story of growth and friendship.',
     icon: SparklesIcon,
   },
 ]
@@ -46,10 +46,10 @@ export function Features() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Everything you need to build lasting habits
+            Why buddies work better than going solo
           </h2>
           <p className="mt-4 text-lg text-gray-600">
-            BuddyUp combines the power of friendship with smart design to make accountability feel natural and fun.
+            BuddyUp turns habit-building into a friendship adventure. Because everything's easier with a friend in your corner.
           </p>
         </div>
         
