@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { redirect } from 'next/navigation'
 
 const createChallengeSchema = z.object({
   partnershipId: z.string(),
@@ -71,55 +72,96 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.id) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const formData = await request.formData()
+    const habitId = formData.get('habitId') as string
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+
+    if (!habitId || !title) {
+      return Response.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const body = await request.json()
-    const data = createChallengeSchema.parse(body)
-
-    // Verify user is part of partnership and it's their turn
-    const partnership = await prisma.partnership.findFirst({
-      where: {
-        id: data.partnershipId,
-        currentTurn: session.user.id,
-        status: 'ACTIVE',
-        OR: [
-          { initiatorId: session.user.id },
-          { receiverId: session.user.id },
-        ],
-      },
+    // Verify user has access to this habit
+    const habit = await prisma.habit.findUnique({
+      where: { id: habitId },
+      include: {
+        partnership: true
+      }
     })
 
-    if (!partnership) {
-      return NextResponse.json({ error: 'Not your turn or partnership not found' }, { status: 403 })
+    if (!habit) {
+      return Response.json({ error: 'Habit not found' }, { status: 404 })
     }
 
+    // Check if user is part of this habit
+    const isParticipant = 
+      habit.createdById === session.user.id ||
+      habit.partnership.initiatorId === session.user.id ||
+      habit.partnership.receiverId === session.user.id
+
+    if (!isParticipant || habit.status !== 'ACTIVE') {
+      return Response.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    // Check if there's already a challenge for today
+    const today = new Date()
+    today.setHours(23, 59, 59, 999) // End of today
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0) // Start of today
+
+    const existingChallenge = await prisma.challenge.findFirst({
+      where: {
+        habitId: habitId,
+        creatorId: session.user.id,
+        dueDate: {
+          gte: todayStart,
+          lte: today
+        }
+      }
+    })
+
+    if (existingChallenge) {
+      return Response.json({ error: 'Challenge already exists for today' }, { status: 400 })
+    }
+
+    // Create the challenge
     const challenge = await prisma.challenge.create({
       data: {
-        partnershipId: data.partnershipId,
+        habitId: habitId,
         creatorId: session.user.id,
-        title: data.title,
-        description: data.description,
-        dueDate: data.dueDate,
-      },
-      include: {
-        creator: {
-          select: { id: true, name: true, email: true, image: true },
-        },
-      },
+        title: title.trim(),
+        description: description?.trim() || null,
+        dueDate: today
+      }
     })
 
-    return NextResponse.json({ challenge })
+    // Update habit's current turn (for alternating challenge creation)
+    const partnerId = habit.partnership.initiatorId === session.user.id 
+      ? habit.partnership.receiverId 
+      : habit.partnership.initiatorId
+
+    await prisma.habit.update({
+      where: { id: habitId },
+      data: { 
+        currentTurn: partnerId, // Switch turn to buddy for next challenge
+        updatedAt: new Date()
+      }
+    })
+
+    return redirect(`/challenges/${challenge.id}`)
+
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid data', details: error.errors }, { status: 400 })
-    }
     console.error('Error creating challenge:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 

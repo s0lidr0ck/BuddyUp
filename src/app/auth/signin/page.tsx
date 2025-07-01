@@ -14,6 +14,7 @@ export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const message = searchParams.get('message')
+  const redirectTo = searchParams.get('redirectTo')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -37,7 +38,9 @@ export default function SignInPage() {
       if (result?.error) {
         setError('Invalid email or password')
       } else if (result?.ok) {
-        router.push('/dashboard')
+        // Redirect to the specified URL or default to dashboard
+        const destination = redirectTo || '/dashboard'
+        router.push(destination)
       }
     } catch (err) {
       setError('Something went wrong. Please try again.')
@@ -45,6 +48,9 @@ export default function SignInPage() {
       setIsLoading(false)
     }
   }
+
+  // Check if this is an invite-related sign-in
+  const isInviteFlow = redirectTo?.includes('/invite/')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center px-4">
@@ -63,11 +69,30 @@ export default function SignInPage() {
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isInviteFlow ? 'Almost there!' : 'Welcome back'}
+          </h1>
           <p className="text-gray-600">
-            Continue your accountability journey
+            {isInviteFlow ? 'Sign in to accept your buddy invitation' : 'Continue your accountability journey'}
           </p>
         </div>
+
+        {/* Invite context card */}
+        {isInviteFlow && (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-primary-600 text-lg">👋</span>
+              </div>
+              <div>
+                <p className="text-primary-800 font-medium text-sm">Buddy Invitation Waiting</p>
+                <p className="text-primary-700 text-xs">
+                  After signing in, you'll be taken to accept your invitation
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           {message && (
@@ -125,6 +150,8 @@ export default function SignInPage() {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                   Signing in...
                 </div>
+              ) : isInviteFlow ? (
+                'Sign In & Accept Invitation'
               ) : (
                 'Sign In'
               )}
@@ -155,20 +182,25 @@ export default function SignInPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <a href="/auth/signup" className="text-primary-600 hover:text-primary-700 font-medium">
+              <a 
+                href={redirectTo ? `/auth/signup?redirectTo=${encodeURIComponent(redirectTo)}` : "/auth/signup"} 
+                className="text-primary-600 hover:text-primary-700 font-medium"
+              >
                 Sign up
               </a>
             </p>
           </div>
 
-          <div className="mt-6 border-t border-gray-200 pt-6">
-            <div className="bg-green-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-green-900 mb-2">🚀 Fast Daily Access</h3>
-              <p className="text-xs text-green-800">
-                Use your password for instant access. No waiting for emails - perfect for daily accountability check-ins!
-              </p>
+          {!isInviteFlow && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-green-900 mb-2">🚀 Fast Daily Access</h3>
+                <p className="text-xs text-green-800">
+                  Use your password for instant access. No waiting for emails - perfect for daily accountability check-ins!
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

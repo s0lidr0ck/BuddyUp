@@ -18,6 +18,7 @@ export default function SignUpPage() {
   // Get invite context from URL
   const inviteCode = searchParams.get('invite')
   const inviterName = searchParams.get('from')
+  const redirectTo = searchParams.get('redirectTo')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -45,7 +46,10 @@ export default function SignUpPage() {
         setSuccess(result.message)
         // Redirect after a short delay to show success message
         setTimeout(() => {
-          if (inviteCode) {
+          if (redirectTo) {
+            // If there's a specific redirect URL, use that
+            router.push(`/auth/signin?message=Account created! Sign in to continue.&redirectTo=${encodeURIComponent(redirectTo)}`)
+          } else if (inviteCode) {
             // If they signed up through an invite, redirect to sign in and then to invite
             router.push(`/auth/signin?message=Account created! Sign in to accept your buddy invitation.&redirectTo=/invite/${inviteCode}`)
           } else {

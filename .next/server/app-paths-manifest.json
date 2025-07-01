@@ -1,12 +1,8 @@
 {
   "/not-found": "app/not-found.js",
-  "/partnerships/invite/page": "app/partnerships/invite/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/api/user/invite-code/route": "app/api/user/invite-code/route.js",
+  "/habits/[habitId]/challenges/new/page": "app/habits/[habitId]/challenges/new/page.js",
+  "/api/dashboard/events/route": "app/api/dashboard/events/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/invite/[code]/page": "app/invite/[code]/page.js",
-  "/auth/signup/page": "app/auth/signup/page.js",
-  "/api/auth/register/route": "app/api/auth/register/route.js",
-  "/auth/signin/page": "app/auth/signin/page.js",
-  "/api/partnerships/accept/route": "app/api/partnerships/accept/route.js"
+  "/api/challenges/route": "app/api/challenges/route.js",
+  "/dashboard/page": "app/dashboard/page.js"
 }

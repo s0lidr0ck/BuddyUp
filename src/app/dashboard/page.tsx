@@ -2,9 +2,11 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import ActivityFeed from '@/components/ActivityFeed'
+import ConnectionStatus from '@/components/ConnectionStatus'
 
 async function getDashboardData(userId: string) {
-  const [user, partnerships, totalChallenges] = await Promise.all([
+  const [user, partnerships, totalChallenges, pendingHabitApprovals, myPendingHabits, recentlyDeclinedHabits] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -41,6 +43,9 @@ async function getDashboardData(userId: string) {
                 },
               },
             },
+            createdBy: {
+              select: { id: true, name: true, email: true },
+            },
           },
         },
       },
@@ -48,9 +53,161 @@ async function getDashboardData(userId: string) {
     prisma.challengeCompletion.count({
       where: { userId },
     }),
+    // Get pending habit approvals (habits created by others that need my approval)
+    prisma.habit.findMany({
+      where: {
+        status: 'PENDING',
+        partnership: {
+          OR: [
+            { initiatorId: userId },
+            { receiverId: userId },
+          ],
+        },
+        NOT: {
+          createdById: userId, // Exclude habits I created
+        },
+      },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+        partnership: {
+          select: { id: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Get habits I created that are pending approval
+    prisma.habit.findMany({
+      where: {
+        status: 'PENDING',
+        createdById: userId,
+      },
+      include: {
+        partnership: {
+          include: {
+            initiator: { select: { id: true, name: true, email: true } },
+            receiver: { select: { id: true, name: true, email: true } }
+          }
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Get recently declined habits (for notification purposes)
+    prisma.habit.findMany({
+      where: {
+        status: 'CANCELLED',
+        createdById: userId,
+        updatedAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+        },
+      },
+      include: {
+        partnership: {
+          include: {
+            initiator: { select: { id: true, name: true, email: true } },
+            receiver: { select: { id: true, name: true, email: true } }
+          }
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    }),
   ])
 
-  return { user, partnerships, totalChallenges }
+  return { user, partnerships, totalChallenges, pendingHabitApprovals, myPendingHabits, recentlyDeclinedHabits }
+}
+
+function createActivityFeed(data: any, userId: string) {
+  const activities: any[] = []
+  
+  // 1. Habit approvals needed (highest priority)
+  data.pendingHabitApprovals.forEach((habit: any) => {
+    activities.push({
+      id: `approval-${habit.id}`,
+      type: 'habit_approval',
+      timestamp: new Date(habit.createdAt),
+      priority: 1,
+      data: habit
+    })
+  })
+
+  // 2. Goals needed (high priority)
+  const activePartnerships = data.partnerships.filter((p: any) => p.status === 'ACTIVE')
+  activePartnerships.forEach((partnership: any) => {
+    const activeHabits = partnership.habits.filter((h: any) => h.status === 'ACTIVE')
+    activeHabits.forEach((habit: any) => {
+      if (habit.currentTurn === userId) {
+        const buddy = partnership.initiatorId === userId ? partnership.receiver : partnership.initiator
+        activities.push({
+          id: `goal-${habit.id}`,
+          type: 'goal_needed',
+          timestamp: new Date(habit.updatedAt),
+          priority: 2,
+          data: {
+            ...habit,
+            buddy
+          }
+        })
+      }
+    })
+  })
+
+  // 3. Pending buddy invites (medium priority)
+  const pendingPartnerships = data.partnerships.filter((p: any) => p.status === 'PENDING')
+  pendingPartnerships.forEach((partnership: any) => {
+    const isInviteReceived = partnership.receiverId === userId
+    if (isInviteReceived) {
+      const buddy = partnership.initiator
+      activities.push({
+        id: `invite-${partnership.id}`,
+        type: 'buddy_invite',
+        timestamp: new Date(partnership.createdAt),
+        priority: 3,
+        data: {
+          partnership,
+          buddy
+        }
+      })
+    }
+  })
+
+  // 4. My pending habits (lower priority)
+  data.myPendingHabits.forEach((habit: any) => {
+    const buddy = habit.partnership.initiatorId === userId 
+      ? habit.partnership.receiver 
+      : habit.partnership.initiator
+    
+    activities.push({
+      id: `pending-${habit.id}`,
+      type: 'habit_pending',
+      timestamp: new Date(habit.createdAt),
+      priority: 4,
+      data: {
+        ...habit,
+        buddy
+      }
+    })
+  })
+
+  // 5. Recently declined habits (lowest priority)
+  data.recentlyDeclinedHabits.forEach((habit: any) => {
+    const buddy = habit.partnership.initiatorId === userId 
+      ? habit.partnership.receiver 
+      : habit.partnership.initiator
+    
+    activities.push({
+      id: `declined-${habit.id}`,
+      type: 'habit_declined',
+      timestamp: new Date(habit.updatedAt),
+      priority: 5,
+      data: {
+        ...habit,
+        buddy
+      }
+    })
+  })
+
+  return activities
 }
 
 export default async function DashboardPage() {
@@ -60,14 +217,18 @@ export default async function DashboardPage() {
     redirect('/auth/signin')
   }
 
-  const { user, partnerships, totalChallenges } = await getDashboardData(session.user.id)
+  const data = await getDashboardData(session.user.id)
+  const { user, partnerships } = data
 
   const activePartnerships = partnerships.filter((p: any) => p.status === 'ACTIVE')
-  const pendingPartnerships = partnerships.filter((p: any) => p.status === 'PENDING')
   
-  // Calculate max streak from all active habits
+  // Calculate stats from all active habits
   const allActiveHabits = activePartnerships.flatMap((p: any) => p.habits.filter((h: any) => h.status === 'ACTIVE'))
   const maxStreak = allActiveHabits.length > 0 ? Math.max(...allActiveHabits.map((h: any) => h.streakCount)) : 0
+  const totalActiveHabits = allActiveHabits.length
+
+  // Create activity feed
+  const activities = createActivityFeed(data, session.user.id)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,237 +251,91 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Habit Dashboard</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-2xl font-bold text-gray-900">Your Activity Feed</h2>
+            <ConnectionStatus enableSSE={true} />
+          </div>
           <p className="text-gray-600">
             {activePartnerships.length === 0 
               ? "Ready to find a buddy to help you stick to your goals?"
-              : `Keep it up! You have ${activePartnerships.length} active buddy${activePartnerships.length !== 1 ? ' connection' : ' connections'}.`
+              : `Stay on top of your habits and buddy activities!`
             }
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-primary-600">{activePartnerships.length}</div>
-            <div className="text-sm text-gray-600">Active Buddies</div>
+            <div className="text-2xl font-bold text-primary-600">{totalActiveHabits}</div>
+            <div className="text-sm text-gray-600">Active Habits</div>
+            {activePartnerships.length > 0 && (
+              <div className="text-xs text-gray-400 mt-1">with {activePartnerships.length} buddy{activePartnerships.length !== 1 ? 'ies' : ''}</div>
+            )}
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
             <div className="text-2xl font-bold text-green-600">{maxStreak}</div>
             <div className="text-sm text-gray-600">Best Streak</div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-purple-600">{totalChallenges}</div>
+            <div className="text-2xl font-bold text-purple-600">{data.totalChallenges}</div>
             <div className="text-sm text-gray-600">Goals Completed</div>
           </div>
+        </div>
+
+        {/* No Buddies State */}
+        {activePartnerships.length === 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center mb-8">
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-8 h-8 bg-primary-600 rounded"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Find Your Buddy</h3>
+            <p className="text-gray-600 mb-6">
+              Get a friend, family member, or colleague to help you stick to your habits and stay motivated.
+            </p>
+            <a
+              href="/partnerships/invite"
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <span className="mr-2">👋</span>
+              Invite Your First Buddy
+            </a>
+          </div>
+        )}
+
+        {/* Activity Feed */}
+        <div className="mb-8">
+          <ActivityFeed 
+            activities={activities} 
+            currentUserId={session.user.id}
+            enableSSE={true}
+          />
+        </div>
+
+        {/* Quick Actions */}
+        {activePartnerships.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{pendingPartnerships.length}</div>
-            <div className="text-sm text-gray-600">Pending Invites</div>
-          </div>
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Left Column - Buddy Connections */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* No Buddies State */}
-            {activePartnerships.length === 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <div className="w-8 h-8 bg-primary-600 rounded"></div>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Find Your Buddy</h3>
-                <p className="text-gray-600 mb-6">
-                  Get a friend, family member, or colleague to help you stick to your habits and stay motivated.
-                </p>
-                <a
-                  href="/partnerships/invite"
-                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                >
-                  <span className="mr-2">👋</span>
-                  Invite Your First Buddy
-                </a>
-              </div>
-            )}
-
-            {/* Active Buddy Connections */}
-            {activePartnerships.map((partnership: any) => {
-              const buddy = partnership.initiatorId === session.user.id 
-                ? partnership.receiver 
-                : partnership.initiator
-              
-              // Get the most active habit or first habit
-              const activeHabits = partnership.habits.filter((h: any) => h.status === 'ACTIVE')
-              const primaryHabit = activeHabits[0] // Show first active habit
-              
-              if (!primaryHabit) {
-                // Partnership exists but no active habits
-                return (
-                  <div key={partnership.id} className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gray-300 rounded-full mr-3"></div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{buddy.name || buddy.email}</h3>
-                          <p className="text-sm text-gray-600">Ready to start building habits together</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <p className="text-blue-800 text-sm mb-2">🎯 Ready to create your first habit together?</p>
-                      <a 
-                        href={`/partnerships/${partnership.id}/habits/new`}
-                        className="inline-flex items-center text-blue-700 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Create a habit →
-                      </a>
-                    </div>
-                  </div>
-                )
-              }
-              
-              const isMyTurn = primaryHabit.currentTurn === session.user.id
-              
-              return (
-                <div key={partnership.id} className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gray-300 rounded-full mr-3"></div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{buddy.name || buddy.email}</h3>
-                        <p className="text-sm text-gray-600">{primaryHabit.name || 'Building habits together'}</p>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-green-600">{primaryHabit.streakCount}</div>
-                      <div className="text-xs text-gray-600">day streak</div>
-                    </div>
-                  </div>
-                  
-                  {isMyTurn ? (
-                    <div className="bg-primary-50 rounded-lg p-4">
-                      <p className="text-primary-800 text-sm mb-2">🎯 Your turn to set a goal!</p>
-                      <a 
-                        href={`/habits/${primaryHabit.id}/challenge`}
-                        className="inline-flex items-center text-primary-700 hover:text-primary-800 text-sm font-medium"
-                      >
-                        Create today's goal →
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-gray-700 text-sm">⏳ Waiting for {buddy.name || 'your buddy'} to set today's goal</p>
-                    </div>
-                  )}
-                  
-                  {/* Show additional habits if any */}
-                  {activeHabits.length > 1 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">
-                        +{activeHabits.length - 1} more habit{activeHabits.length > 2 ? 's' : ''} together
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Add More Buddies */}
-            {activePartnerships.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 border-dashed p-6 text-center">
-                <h3 className="font-medium text-gray-900 mb-2">Want another buddy?</h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  You can have multiple buddies for different habits and goals.
-                </p>
-                <a
-                  href="/partnerships/invite"
-                  className="inline-flex items-center text-primary-600 hover:text-primary-700 text-sm font-medium"
-                >
-                  <span className="mr-2">👋</span>
-                  Invite Another Buddy
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Recent Activity */}
-          <div className="space-y-6">
-            
-            {/* Pending Buddy Invites */}
-            {pendingPartnerships.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Pending Invitations</h3>
-                <div className="space-y-3">
-                  {pendingPartnerships.map((partnership: any) => {
-                    const buddy = partnership.initiatorId === session.user.id 
-                      ? partnership.receiver 
-                      : partnership.initiator
-                    const isInviteReceived = partnership.receiverId === session.user.id
-                    
-                    return (
-                      <div key={partnership.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{buddy.name || buddy.email}</p>
-                          <p className="text-xs text-gray-600">
-                            {isInviteReceived ? 'Wants to be your buddy' : 'Invitation sent'}
-                          </p>
-                        </div>
-                        {isInviteReceived && (
-                          <div className="flex space-x-2">
-                            <button className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Accept
-                            </button>
-                            <button className="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400">
-                              Decline
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <a href="/partnerships/invite" className="flex items-center text-gray-700 hover:text-primary-600 text-sm">
-                  <span className="mr-3">👋</span>
-                  Invite Buddy
-                </a>
-                <a href="/inspiration" className="flex items-center text-gray-700 hover:text-primary-600 text-sm">
-                  <span className="mr-3">✨</span>
-                  Inspiration Wall
-                </a>
-                <a href="/badges" className="flex items-center text-gray-700 hover:text-primary-600 text-sm">
-                  <span className="mr-3">🏆</span>
-                  View Badges
-                </a>
-                <a href="/settings" className="flex items-center text-gray-700 hover:text-primary-600 text-sm">
-                  <span className="mr-3">⚙️</span>
-                  Settings
-                </a>
-              </div>
-            </div>
-
-            {/* Motivational Quote */}
-            <div className="bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg p-6 text-white">
-              <h3 className="font-semibold mb-2">💪 Daily Motivation</h3>
-              <p className="text-sm opacity-90">
-                "Success is the sum of small efforts repeated day in and day out."
-              </p>
-              <p className="text-xs opacity-75 mt-2">- Robert Collier</p>
+            <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div className="flex justify-center space-x-4">
+              <a
+                href="/habits/new"
+                className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <span className="mr-2">🎯</span>
+                Create New Habit
+              </a>
+              <a
+                href="/partnerships/invite"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="mr-2">👋</span>
+                Got another buddy?
+              </a>
             </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   )
