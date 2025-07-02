@@ -24,10 +24,10 @@ export async function GET() {
       },
       include: {
         initiator: {
-          select: { id: true, name: true, email: true, image: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
         },
         receiver: {
-          select: { id: true, name: true, email: true, image: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
         },
         habits: {
           orderBy: { createdAt: 'desc' },
@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
       },
       include: {
         initiator: {
-          select: { id: true, name: true, email: true, image: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
         },
         receiver: {
-          select: { id: true, name: true, email: true, image: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
         },
       },
     })

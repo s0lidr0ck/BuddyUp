@@ -1,7 +1,6 @@
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { redirect } from 'next/navigation'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -13,7 +12,8 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const challengeId = formData.get('challengeId') as string
-    const proofText = formData.get('proofText') as string
+    const reflectionNote = formData.get('reflectionNote') as string
+    const feelingTags = formData.get('feelingTags') as string
 
     if (!challengeId) {
       return Response.json({ error: 'Missing challenge ID' }, { status: 400 })
@@ -47,9 +47,24 @@ export async function POST(request: Request) {
     }
 
     // Check if already completed
-    const existingCompletion = challenge.completions.find(c => c.userId === session.user.id)
+    const existingCompletion = challenge.completions.find((c: any) => c.userId === session.user.id)
     if (existingCompletion) {
       return Response.json({ error: 'Challenge already completed' }, { status: 400 })
+    }
+
+    // Check if challenge is due (can't complete future challenges)
+    const today = new Date()
+    const challengeDueDate = new Date(challenge.dueDate)
+    
+    // Set both to start of day for accurate comparison
+    today.setHours(0, 0, 0, 0)
+    challengeDueDate.setHours(0, 0, 0, 0)
+    
+    if (challengeDueDate > today) {
+      return Response.json({ 
+        error: 'Cannot complete future challenges. This goal is due on ' + challengeDueDate.toLocaleDateString(),
+        isFutureChallenge: true 
+      }, { status: 400 })
     }
 
     // Create completion
@@ -57,7 +72,8 @@ export async function POST(request: Request) {
       data: {
         challengeId: challengeId,
         userId: session.user.id,
-        proofText: proofText?.trim() || null
+        reflectionNote: reflectionNote?.trim() || null,
+        feelingTags: feelingTags || null
       }
     })
 
@@ -70,22 +86,21 @@ export async function POST(request: Request) {
       ? challenge.habit.partnership.receiverId 
       : challenge.habit.partnership.initiatorId
 
-    const bothCompleted = allCompletions.some(c => c.userId === session.user.id) && 
-                         allCompletions.some(c => c.userId === partnerId)
+    const bothCompleted = allCompletions.some((c: any) => c.userId === session.user.id) && 
+                         allCompletions.some((c: any) => c.userId === partnerId)
 
-    // Update habit streak if both completed
+    // Update habit streak if both completed (turn already switched when challenge was created)
     if (bothCompleted) {
       await prisma.habit.update({
         where: { id: challenge.habit.id },
         data: { 
           streakCount: { increment: 1 },
-          lastCompletedAt: new Date(),
           updatedAt: new Date()
         }
       })
     }
 
-    return redirect(`/challenges/${challengeId}`)
+    return Response.redirect(new URL(`/challenges/${challengeId}`, request.url), 303)
 
   } catch (error) {
     console.error('Error completing challenge:', error)

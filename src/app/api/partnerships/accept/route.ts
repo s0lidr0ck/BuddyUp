@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // Check if inviter exists
     const inviter = await prisma.user.findUnique({
       where: { id: inviterId },
-      select: { id: true, name: true, email: true }
+      select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true }
     })
 
     if (!inviter) {
@@ -55,10 +55,10 @@ export async function POST(request: Request) {
       },
       include: {
         initiator: {
-          select: { name: true, email: true }
+          select: { firstName: true, lastName: true, email: true, profilePicture: true }
         },
         receiver: {
-          select: { name: true, email: true }
+          select: { firstName: true, lastName: true, email: true, profilePicture: true }
         }
       }
     })

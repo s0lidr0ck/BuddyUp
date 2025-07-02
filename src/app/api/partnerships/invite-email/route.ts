@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // Get the inviting user's info
     const inviter = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, email: true }
+      select: { firstName: true, lastName: true, email: true, profilePicture: true }
     })
 
     if (!inviter) {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     
     console.log(`EMAIL INVITE SENT:
     To: ${receiverEmail}
-    From: ${inviter.name || inviter.email}
+    From: ${inviter.firstName || inviter.lastName || inviter.email}
     Invite Link: ${inviteUrl}
     `)
 
@@ -42,10 +42,10 @@ export async function POST(request: Request) {
     /*
     await sendEmail({
       to: receiverEmail,
-      subject: `${inviter.name} wants to be your BuddyUp buddy!`,
+      subject: `${inviter.firstName || inviter.lastName} wants to be your BuddyUp buddy!`,
       html: `
         <h1>You're invited to join BuddyUp!</h1>
-        <p>${inviter.name} wants to be your buddy and build great habits together.</p>
+        <p>${inviter.firstName || inviter.lastName} wants to be your buddy and build great habits together.</p>
         <a href="${inviteUrl}">Accept Invitation</a>
       `
     })

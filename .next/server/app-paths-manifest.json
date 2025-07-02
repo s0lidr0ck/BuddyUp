@@ -1,8 +1,5 @@
 {
-  "/not-found": "app/not-found.js",
-  "/habits/[habitId]/challenges/new/page": "app/habits/[habitId]/challenges/new/page.js",
-  "/api/dashboard/events/route": "app/api/dashboard/events/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/challenges/route": "app/api/challenges/route.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/api/user/invite-code/route": "app/api/user/invite-code/route.js",
+  "/partnerships/invite/page": "app/partnerships/invite/page.js"
 }

@@ -15,13 +15,25 @@ async function getInviteData(code: string) {
     where: { inviteCode: code },
     select: { 
       id: true, 
-      name: true, 
+      firstName: true, 
+      lastName: true, 
       email: true,
+      profilePicture: true,
       inviteCode: true 
     }
   })
 
   return inviter
+}
+
+function formatUserName(user: any): string {
+  if (user.firstName && user.lastName) {
+    return `${user.firstName} ${user.lastName}`
+  } else if (user.firstName) {
+    return user.firstName
+  } else {
+    return user.email
+  }
 }
 
 export default async function InvitePage({ params }: PageProps) {
@@ -76,7 +88,7 @@ export default async function InvitePage({ params }: PageProps) {
 
   // If user is not logged in, redirect to sign up with invite context
   if (!session?.user?.id) {
-    redirect(`/auth/signup?invite=${params.code}&from=${encodeURIComponent(inviter.name || inviter.email)}`)
+    redirect(`/auth/signup?invite=${params.code}&from=${encodeURIComponent(formatUserName(inviter))}`)
   }
 
   // User is logged in - show invite acceptance
@@ -92,14 +104,14 @@ export default async function InvitePage({ params }: PageProps) {
           
           <div className="mb-6">
             <p className="text-gray-600 mb-2">
-              <span className="font-semibold text-gray-900">{inviter.name || inviter.email}</span> wants to be your buddy on BuddyUp.
+              <span className="font-semibold text-gray-900">{formatUserName(inviter)}</span> wants to be your buddy on BuddyUp.
             </p>
             <p className="text-gray-600">
               Connect with them to build great habits together and keep each other motivated!
             </p>
           </div>
 
-          <AcceptInviteForm inviterId={inviter.id} inviterName={inviter.name || inviter.email} />
+          <AcceptInviteForm inviterId={inviter.id} inviterName={formatUserName(inviter)} />
         </div>
       </div>
     </div>

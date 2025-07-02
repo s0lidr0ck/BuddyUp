@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { redirect } from 'next/navigation'
 
 const createChallengeSchema = z.object({
   partnershipId: z.string(),
@@ -111,29 +110,109 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    // Check if there's already a challenge for today
+    // Check if there's already a challenge for today or if we should create tomorrow's challenge
     const today = new Date()
     today.setHours(23, 59, 59, 999) // End of today
 
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0) // Start of today
 
-    const existingChallenge = await prisma.challenge.findFirst({
+    // Check for any existing challenge for today for this habit
+    const existingTodayChallenge = await prisma.challenge.findFirst({
       where: {
         habitId: habitId,
-        creatorId: session.user.id,
         dueDate: {
           gte: todayStart,
           lte: today
         }
+      },
+      include: {
+        completions: true
       }
     })
 
-    if (existingChallenge) {
-      return Response.json({ error: 'Challenge already exists for today' }, { status: 400 })
+    // If there's a challenge for today, check if both users have completed it
+    if (existingTodayChallenge) {
+      const userIds = [habit.partnership.initiatorId, habit.partnership.receiverId]
+      const completedUserIds = existingTodayChallenge.completions.map((c: any) => c.userId)
+      const bothCompleted = userIds.every(id => completedUserIds.includes(id))
+      
+      console.log('Challenge exists for today:', {
+        challengeId: existingTodayChallenge.id,
+        userIds,
+        completedUserIds, 
+        bothCompleted,
+        currentUser: session.user.id
+      })
+      
+      if (!bothCompleted) {
+        // Check if current user has already completed
+        const currentUserCompleted = completedUserIds.includes(session.user.id)
+        if (currentUserCompleted) {
+          return Response.json({ 
+            error: 'Waiting for your buddy to complete today\'s challenge before you can set tomorrow\'s goal',
+            needsBuddyCompletion: true 
+          }, { status: 400 })
+        } else {
+          return Response.json({ 
+            error: 'Please complete today\'s challenge first',
+            needsCompletion: true 
+          }, { status: 400 })
+        }
+      }
+      
+      // Both completed today's challenge, so create tomorrow's challenge
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(23, 59, 59, 999)
+      
+      // Check if tomorrow's challenge already exists
+      const tomorrowStart = new Date()
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+      tomorrowStart.setHours(0, 0, 0, 0)
+      
+      const existingTomorrowChallenge = await prisma.challenge.findFirst({
+        where: {
+          habitId: habitId,
+          dueDate: {
+            gte: tomorrowStart,
+            lte: tomorrow
+          }
+        }
+      })
+      
+      if (existingTomorrowChallenge) {
+        return Response.json({ error: 'Challenge already exists for tomorrow' }, { status: 400 })
+      }
+      
+      // Create tomorrow's challenge
+      const challenge = await prisma.challenge.create({
+        data: {
+          habitId: habitId,
+          creatorId: session.user.id,
+          title: title.trim(),
+          description: description?.trim() || null,
+          dueDate: tomorrow
+        }
+      })
+
+      // Switch turn to the other person for the day after tomorrow
+      const nextTurn = habit.partnership.initiatorId === session.user.id 
+        ? habit.partnership.receiverId 
+        : habit.partnership.initiatorId
+
+      await prisma.habit.update({
+        where: { id: habitId },
+        data: { 
+          currentTurn: nextTurn, // Switch turn for next goal setting
+          updatedAt: new Date()
+        }
+      })
+
+      return Response.json({ success: true, challengeId: challenge.id })
     }
 
-    // Create the challenge
+    // No existing challenge for today, create one
     const challenge = await prisma.challenge.create({
       data: {
         habitId: habitId,
@@ -144,20 +223,20 @@ export async function POST(request: Request) {
       }
     })
 
-    // Update habit's current turn (for alternating challenge creation)
-    const partnerId = habit.partnership.initiatorId === session.user.id 
+    // Switch turn to the other person immediately so they know they'll set tomorrow's goal
+    const nextTurn = habit.partnership.initiatorId === session.user.id 
       ? habit.partnership.receiverId 
       : habit.partnership.initiatorId
 
     await prisma.habit.update({
       where: { id: habitId },
       data: { 
-        currentTurn: partnerId, // Switch turn to buddy for next challenge
+        currentTurn: nextTurn, // Switch turn for tomorrow's goal setting
         updatedAt: new Date()
       }
     })
 
-    return redirect(`/challenges/${challenge.id}`)
+    return Response.json({ success: true, challengeId: challenge.id })
 
   } catch (error) {
     console.error('Error creating challenge:', error)

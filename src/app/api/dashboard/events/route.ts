@@ -47,7 +47,13 @@ export async function GET(request: Request) {
                 updatedAt: true,
                 name: true,
                 createdBy: {
-                  select: { name: true, email: true }
+                  select: { 
+                    id: true, 
+                    firstName: true, 
+                    lastName: true, 
+                    email: true, 
+                    profilePicture: true 
+                  }
                 }
               }
             }),

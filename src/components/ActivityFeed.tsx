@@ -6,7 +6,7 @@ import HabitApprovalButtons from './HabitApprovalButtons'
 
 interface ActivityItem {
   id: string
-  type: 'habit_approval' | 'habit_pending' | 'habit_declined' | 'buddy_invite' | 'goal_needed' | 'habit_approved'
+  type: 'habit_approval' | 'habit_pending' | 'habit_declined' | 'buddy_invite' | 'goal_needed' | 'goal_waiting' | 'challenge_completion' | 'challenges_completion' | 'habit_approved'
   timestamp: Date
   priority: number // Lower = higher priority
   data: any
@@ -24,8 +24,68 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
   const [isConnected, setIsConnected] = useState(false)
   const [updateIndicator, setUpdateIndicator] = useState<string | null>(null)
   
+  // Helper function to format user display name
+  const formatUserName = (user: any): string => {
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`
+    } else if (user.firstName) {
+      return user.firstName
+    } else {
+      return user.email
+    }
+  }
+
+  // Helper function to render user avatar
+  const renderUserAvatar = (user: any, size: string = 'w-10 h-10') => {
+    if (user.profilePicture) {
+      return (
+        <img 
+          src={user.profilePicture} 
+          alt={`${formatUserName(user)}'s profile`}
+          className={`${size} rounded-full object-cover`}
+        />
+      )
+    } else {
+      const initial = user.firstName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || '?'
+      return (
+        <div className={`${size} bg-blue-100 rounded-full flex items-center justify-center`}>
+          <span className="text-blue-600 text-lg font-medium">{initial}</span>
+        </div>
+      )
+    }
+  }
+  
   const handleUpdate = () => {
     router.refresh()
+  }
+
+  const handleDismissDeclinedHabit = async (habitId: string) => {
+    try {
+      console.log('Dismissing habit:', habitId) // Debug log
+      const response = await fetch(`/api/habits/${habitId}/dismiss`, {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        console.log('Habit dismissed successfully')
+        router.refresh() // Refresh to remove the dismissed notification
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to dismiss habit notification:', errorData)
+        
+        // Show user-friendly error message
+        if (response.status === 404) {
+          alert('This notification is no longer available.')
+        } else if (response.status === 403) {
+          alert('You do not have permission to dismiss this notification.')
+        } else {
+          alert('Failed to dismiss notification. Please try again.')
+        }
+      }
+    } catch (error) {
+      console.error('Error dismissing habit notification:', error)
+      alert('Failed to dismiss notification. Please check your connection and try again.')
+    }
   }
 
   // Server-Sent Events implementation
@@ -136,13 +196,11 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-blue-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 text-lg">👋</span>
-              </div>
+              {renderUserAvatar(data.createdBy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    {data.createdBy.name || data.createdBy.email} wants to start a habit with you!
+                    {formatUserName(data.createdBy)} wants to start a habit with you!
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
@@ -164,13 +222,11 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-yellow-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                <span className="text-yellow-600 text-lg">⏳</span>
-              </div>
+              {renderUserAvatar(data.buddy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    Waiting for {data.buddy.name || data.buddy.email} to approve
+                    Waiting for {formatUserName(data.buddy)} to approve
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
@@ -191,26 +247,33 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-red-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-red-600 text-lg">❌</span>
-              </div>
+              {renderUserAvatar(data.buddy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    {data.buddy.name || data.buddy.email} declined your habit
+                    {formatUserName(data.buddy)} declined your habit
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
                 <p className="text-gray-700 mb-3">
                   "<strong>{data.name}</strong>" - No worries, try suggesting something else!
                 </p>
-                <a
-                  href={`/partnerships/${data.partnership.id}/habits/new`}
-                  className="inline-flex items-center text-red-600 hover:text-red-700 text-sm font-medium"
-                >
-                  <span className="mr-2">↻</span>
-                  Suggest a different habit
-                </a>
+                <div className="flex items-center justify-between">
+                  <a
+                    href={`/partnerships/${data.partnership.id}/habits/new`}
+                    className="inline-flex items-center text-red-600 hover:text-red-700 text-sm font-medium"
+                  >
+                    <span className="mr-2">↻</span>
+                    Suggest a different habit
+                  </a>
+                  <button
+                    onClick={() => handleDismissDeclinedHabit(data.id)}
+                    className="inline-flex items-center text-gray-600 hover:text-gray-700 text-sm font-medium"
+                  >
+                    <span className="mr-2">✕</span>
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -220,13 +283,11 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-green-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600 text-lg">🤝</span>
-              </div>
+              {renderUserAvatar(data.buddy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    {data.buddy.name || data.buddy.email} wants to be your buddy!
+                    {formatUserName(data.buddy)} wants to be your buddy!
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
@@ -247,32 +308,74 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         )
 
       case 'goal_needed':
+        const goalDay = data.isSettingTomorrow ? "tomorrow" : "today"
+        const goalDayCapitalized = data.isSettingTomorrow ? "Tomorrow" : "Today"
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-primary-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary-600 text-lg">🎯</span>
-              </div>
+              {renderUserAvatar(data.buddy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    Ready to set today's goal?
+                    Ready to set {goalDay}'s goal?
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
                 <p className="text-gray-700 mb-3">
-                  Create today's challenge for "<strong>{data.name}</strong>" with {data.buddy.name || data.buddy.email}
+                  Create {goalDay}'s challenge for "<strong>{data.name}</strong>" with {formatUserName(data.buddy)}
+                  {data.isSettingTomorrow && <span className="text-green-600 font-medium"> • Great job completing today! 🎉</span>}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    🔥 {data.streakCount} day streak
+                  </div>
+                  <div className="flex space-x-2">
+                    <a
+                      href={`/partnerships/${data.partnershipId}/chat`}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="mr-2">💬</span>
+                      Chat
+                    </a>
+                    <a
+                      href={`/habits/${data.id}/challenges/new`}
+                      className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+                    >
+                      <span className="mr-2">🎯</span>
+                      Set {goalDayCapitalized}'s Goal
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'goal_waiting':
+        return (
+          <div key={activity.id} className="bg-white rounded-lg border border-gray-300 p-6 shadow-sm">
+            <div className="flex items-start space-x-4">
+              {renderUserAvatar(data.buddy)}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">
+                    Waiting for {formatUserName(data.buddy)}
+                  </h3>
+                  <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
+                </div>
+                <p className="text-gray-700 mb-3">
+                  "<strong>{data.name}</strong>" - {formatUserName(data.buddy)}'s turn to set today's goal
                 </p>
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
                     🔥 {data.streakCount} day streak
                   </div>
                   <a
-                    href={`/habits/${data.id}/challenges/new`}
-                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+                    href={`/partnerships/${data.partnershipId}/chat`}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <span className="mr-2">🎯</span>
-                    Set Today's Goal
+                    <span className="mr-2">💬</span>
+                    Chat with {formatUserName(data.buddy)}
                   </a>
                 </div>
               </div>
@@ -284,13 +387,11 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
         return (
           <div key={activity.id} className="bg-white rounded-lg border border-green-200 p-6 shadow-sm">
             <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600 text-lg">🎉</span>
-              </div>
+              {renderUserAvatar(data.buddy)}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">
-                    {data.buddy.name || data.buddy.email} approved your habit!
+                    {formatUserName(data.buddy)} approved your habit!
                   </h3>
                   <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
                 </div>
@@ -304,6 +405,163 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
                   <span className="mr-2">🎯</span>
                   Create your first goal
                 </a>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'challenge_completion':
+        return (
+          <div key={activity.id} className="bg-white rounded-lg border border-purple-200 p-6 shadow-sm">
+            <div className="flex items-start space-x-4">
+              {renderUserAvatar(data.buddy)}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">
+                    Complete today's challenge!
+                  </h3>
+                  <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
+                </div>
+                <p className="text-gray-700 mb-3">
+                  "<strong>{data.title}</strong>" with {formatUserName(data.buddy)}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    🔥 {data.habit.streakCount} day streak
+                  </div>
+                  <a
+                    href={`/challenges/${data.id}`}
+                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <span className="mr-2">✅</span>
+                    Complete Challenge
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'challenges_completion':
+        return (
+          <div key={activity.id} className="bg-white rounded-lg border border-purple-200 p-6 shadow-sm">
+            <div className="flex items-start space-x-4">
+              {renderUserAvatar(data.buddy)}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">
+                    Your challenges with {formatUserName(data.buddy)}
+                  </h3>
+                  <span className="text-xs text-gray-500">{formatTimeAgo(timestamp)}</span>
+                </div>
+                
+                {/* Challenge list with status indicators */}
+                <div className="space-y-2 mb-4">
+                  {data.challenges.map((challenge: any, index: number) => {
+                    const today = new Date().toDateString()
+                    const challengeDate = new Date(challenge.dueDate).toDateString()
+                    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+                    
+                    const isToday = challengeDate === today
+                    const isTomorrow = challengeDate === tomorrow
+                    const isFuture = new Date(challenge.dueDate) > new Date(tomorrow)
+                    const isPast = new Date(challenge.dueDate) < new Date(today)
+                    const isCompleted = challenge.userCompleted
+                    
+                    let statusColor = 'gray'
+                    let statusIcon = '📅'
+                    let statusText = 'Scheduled'
+                    let canComplete = false
+                    
+                    if (isCompleted) {
+                      statusColor = 'green'
+                      statusIcon = '✅'
+                      statusText = 'Completed'
+                    } else if (isPast) {
+                      statusColor = 'red'
+                      statusIcon = '⏰'
+                      statusText = 'Overdue'
+                      canComplete = true
+                    } else if (isToday) {
+                      statusColor = 'yellow'
+                      statusIcon = '🎯'
+                      statusText = 'Due Today'
+                      canComplete = true
+                    } else if (isTomorrow) {
+                      statusColor = 'blue'
+                      statusIcon = '📅'
+                      statusText = 'Tomorrow'
+                    } else if (isFuture) {
+                      statusColor = 'gray'
+                      statusIcon = '🗓️'
+                      statusText = new Date(challenge.dueDate).toLocaleDateString()
+                    }
+                    
+                    return (
+                      <div key={challenge.id} className={`flex items-center justify-between rounded-lg p-3 ${
+                        statusColor === 'green' ? 'bg-green-50 border border-green-200' :
+                        statusColor === 'red' ? 'bg-red-50 border border-red-200' :
+                        statusColor === 'yellow' ? 'bg-yellow-50 border border-yellow-200' :
+                        statusColor === 'blue' ? 'bg-blue-50 border border-blue-200' :
+                        'bg-gray-50 border border-gray-200'
+                      }`}>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">{statusIcon}</span>
+                            <span className="font-medium text-gray-900">"{challenge.title}"</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              statusColor === 'green' ? 'bg-green-100 text-green-800' :
+                              statusColor === 'red' ? 'bg-red-100 text-red-800' :
+                              statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                              statusColor === 'blue' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {statusText}
+                            </span>
+                          </div>
+                          {challenge.description && (
+                            <p className="text-sm text-gray-600 ml-6">{challenge.description}</p>
+                          )}
+                        </div>
+                        <div className="ml-3 flex space-x-2">
+                          <a
+                            href={`/challenges/${challenge.id}`}
+                            className={`px-3 py-1 border text-sm rounded transition-colors ${
+                              isCompleted 
+                                ? 'border-green-600 text-green-600 hover:bg-green-50'
+                                : canComplete
+                                ? 'border-purple-600 text-purple-600 hover:bg-purple-50'
+                                : 'border-gray-400 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {isCompleted ? 'View' : isFuture ? 'Preview' : 'View'}
+                          </a>
+                          {canComplete && !isCompleted && (
+                            <a
+                              href={`/challenges/${challenge.id}`}
+                              className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                            >
+                              Complete
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    🔥 {data.streakCount} day streak • {data.challenges.length} challenge{data.challenges.length !== 1 ? 's' : ''}
+                  </div>
+                  <a
+                    href={`/partnerships/${data.challenges[0]?.habit?.partnershipId}/chat`}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="mr-2">💬</span>
+                    Chat
+                  </a>
+                </div>
               </div>
             </div>
           </div>

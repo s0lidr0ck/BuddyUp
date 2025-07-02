@@ -39,10 +39,11 @@ model Session {
 
 model User {
   id            String    @id @default(cuid())
-  name          String?
+  firstName     String?
+  lastName      String?
   email         String    @unique
   emailVerified DateTime?
-  image         String?
+  profilePicture String?  // URL to profile picture (could be uploaded file or avatar service)
   username      String?   @unique
   password      String?   // For password authentication
   inviteCode    String?   @unique @default(cuid()) // Personal invite link
@@ -125,6 +126,9 @@ model Habit {
   totalDays     Int         @default(0)
   mulligansUsed Int         @default(0)
   maxMulligans  Int         @default(1)
+  
+  // Notification tracking
+  dismissedAt   DateTime?   // When user dismissed a declined habit notification
   
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

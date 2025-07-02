@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
+import ChallengeForm from './ChallengeForm'
 
 interface PageProps {
   params: {
@@ -26,8 +27,11 @@ async function getHabitData(habitId: string, userId: string) {
             gte: new Date(new Date().toDateString()), // Today or later
           }
         },
+        include: {
+          completions: true
+        },
         orderBy: { dueDate: 'desc' },
-        take: 1
+        take: 2 // Get today and tomorrow if they exist
       }
     }
   })
@@ -64,9 +68,28 @@ export default async function NewChallengePage({ params }: PageProps) {
 
   // Check if there's already a challenge for today
   const today = new Date().toDateString()
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+  
   const existingTodayChallenge = habit.challenges.find(
-    c => new Date(c.dueDate).toDateString() === today
+    (c: any) => new Date(c.dueDate).toDateString() === today
   )
+  
+  const existingTomorrowChallenge = habit.challenges.find(
+    (c: any) => new Date(c.dueDate).toDateString() === tomorrow
+  )
+
+  // Check if both users completed today's challenge
+  let bothCompletedToday = false
+  if (existingTodayChallenge) {
+    const userIds = [habit.partnership.initiatorId, habit.partnership.receiverId]
+    const completedUserIds = existingTodayChallenge.completions.map((c: any) => c.userId)
+    bothCompletedToday = userIds.every(id => completedUserIds.includes(id))
+  }
+
+  // Determine what we're setting
+  const isSettingTomorrow = existingTodayChallenge && bothCompletedToday
+  const targetDay = isSettingTomorrow ? "Tomorrow" : "Today"
+  const existingTargetChallenge = isSettingTomorrow ? existingTomorrowChallenge : existingTodayChallenge
 
   const buddy = habit.partnership.initiatorId === session.user.id 
     ? habit.partnership.receiver 
@@ -99,7 +122,7 @@ export default async function NewChallengePage({ params }: PageProps) {
         <div className="bg-white rounded-lg border border-gray-200 p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Set Today's Goal
+              Set {targetDay}'s Goal
             </h2>
             <div className="flex items-center space-x-4 text-sm text-gray-600">
               <span>📝 {habit.name}</span>
@@ -108,80 +131,24 @@ export default async function NewChallengePage({ params }: PageProps) {
             </div>
           </div>
 
-          {existingTodayChallenge ? (
+          {existingTargetChallenge ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
               <div className="text-2xl mb-3">✅</div>
               <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                You already set today's goal!
+                You already set {targetDay}'s goal!
               </h3>
               <p className="text-blue-700 mb-4">
-                "<strong>{existingTodayChallenge.title}</strong>"
+                "<strong>{existingTargetChallenge.title}</strong>"
               </p>
               <a
-                href={`/challenges/${existingTodayChallenge.id}`}
+                href={`/challenges/${existingTargetChallenge.id}`}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                View Today's Challenge
+                View {targetDay}'s Challenge
               </a>
             </div>
           ) : (
-            <form action="/api/challenges" method="POST">
-              <input type="hidden" name="habitId" value={habit.id} />
-              
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                    What's your specific goal for today?
-                  </label>
-                  <input
-                    type="text"
-                    id="title"
-                    name="title"
-                    required
-                    placeholder="e.g., Do 20 push-ups, Read for 30 minutes, Meditate for 10 minutes"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional details (optional)
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={3}
-                    placeholder="Any specific notes, location, or requirements for this goal..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">💡 Goal-setting tips:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Be specific: "20 push-ups" vs "exercise"</li>
-                    <li>• Make it measurable: Include time, reps, or distance</li>
-                    <li>• Keep it achievable for today</li>
-                    <li>• Your buddy will see this and can help motivate you!</li>
-                  </ul>
-                </div>
-
-                <div className="flex space-x-4">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-primary-600 text-white py-3 px-6 rounded-lg hover:bg-primary-700 transition-colors font-medium"
-                  >
-                    🎯 Set Today's Goal
-                  </button>
-                  <a
-                    href="/dashboard"
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </a>
-                </div>
-              </div>
-            </form>
+            <ChallengeForm habitId={habit.id} />
           )}
         </div>
 

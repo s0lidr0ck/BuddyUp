@@ -32,11 +32,11 @@ export async function POST(
       include: {
         partnership: {
           include: {
-            initiator: { select: { id: true, name: true, email: true } },
-            receiver: { select: { id: true, name: true, email: true } }
+            initiator: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
+            receiver: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
           }
         },
-        createdBy: { select: { id: true, name: true, email: true } }
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
       }
     })
 
@@ -70,17 +70,18 @@ export async function POST(
       where: { id: params.habitId },
       data: { 
         status: newStatus,
-        // If approved, set the start date to today
-        startDate: action === 'approve' ? new Date() : undefined
+        // If approved, set the start date to today and give the approver the first turn
+        startDate: action === 'approve' ? new Date() : undefined,
+        currentTurn: action === 'approve' ? session.user.id : undefined
       },
       include: {
         partnership: {
           include: {
-            initiator: { select: { id: true, name: true, email: true } },
-            receiver: { select: { id: true, name: true, email: true } }
+            initiator: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
+            receiver: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
           }
         },
-        createdBy: { select: { id: true, name: true, email: true } }
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
       }
     })
 

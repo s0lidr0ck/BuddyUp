@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
+import EnhancedCompletionForm from '@/components/EnhancedCompletionForm'
 
 interface PageProps {
   params: {
@@ -63,11 +64,19 @@ export default async function ChallengePage({ params }: PageProps) {
     ? challenge.habit.partnership.receiver 
     : challenge.habit.partnership.initiator
 
-  const userCompletion = challenge.completions.find(c => c.userId === session.user.id)
-  const buddyCompletion = challenge.completions.find(c => c.userId === buddy.id)
+  const userCompletion = challenge.completions.find((c: any) => c.userId === session.user.id)
+  const buddyCompletion = challenge.completions.find((c: any) => c.userId === buddy.id)
 
   const isOverdue = new Date() > new Date(challenge.dueDate)
   const daysLeft = Math.ceil((new Date(challenge.dueDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
+  
+  // Check if challenge is due today (can only complete today or overdue challenges)
+  const today = new Date()
+  const challengeDueDate = new Date(challenge.dueDate)
+  today.setHours(0, 0, 0, 0)
+  challengeDueDate.setHours(0, 0, 0, 0)
+  const isFutureChallenge = challengeDueDate > today
+  const canComplete = !isFutureChallenge
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -97,14 +106,16 @@ export default async function ChallengePage({ params }: PageProps) {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">
-                Today's Goal
+                {isFutureChallenge ? "Tomorrow's Goal" : "Today's Goal"}
               </h2>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                 isOverdue ? 'bg-red-100 text-red-700' :
+                isFutureChallenge ? 'bg-blue-100 text-blue-700' :
                 daysLeft === 0 ? 'bg-yellow-100 text-yellow-700' :
                 'bg-green-100 text-green-700'
               }`}>
                 {isOverdue ? 'Overdue' : 
+                 isFutureChallenge ? `Due ${challengeDueDate.toLocaleDateString()}` :
                  daysLeft === 0 ? 'Due Today' : 
                  `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
               </div>
@@ -125,6 +136,22 @@ export default async function ChallengePage({ params }: PageProps) {
             </div>
           </div>
 
+          {/* Future Challenge Notice */}
+          {isFutureChallenge && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <div className="text-blue-600 text-lg mr-3">📅</div>
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-1">Future Goal</h4>
+                  <p className="text-blue-800 text-sm">
+                    This goal is scheduled for {challengeDueDate.toLocaleDateString()}. 
+                    You can complete it starting on that date. Come back then!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Progress Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Your Progress */}
@@ -144,38 +171,63 @@ export default async function ChallengePage({ params }: PageProps) {
                       </div>
                     </div>
                   )}
+                  {userCompletion.reflectionNote && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Your reflection:</div>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {userCompletion.reflectionNote}
+                      </div>
+                    </div>
+                  )}
+                  {userCompletion.feelingTags && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">How you felt:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          try {
+                            const tags = JSON.parse(userCompletion.feelingTags)
+                            return (
+                              <>
+                                {tags.difficulty && (
+                                  <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                    Difficulty: {tags.difficulty.replace('_', ' ')}
+                                  </span>
+                                )}
+                                {tags.feeling && (
+                                  <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                    Feeling: {tags.feeling}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          } catch {
+                            // Fallback for old format
+                            return JSON.parse(userCompletion.feelingTags).map((tag: string) => (
+                              <span key={tag} className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                {tag}
+                              </span>
+                            ))
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500">
                     Completed {new Date(userCompletion.createdAt).toLocaleString()}
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <div className="text-4xl mb-2">⏳</div>
-                  <div className="text-gray-600">Not completed yet</div>
-                  {!isOverdue && (
-                    <form action="/api/challenges/complete" method="POST" className="mt-4">
-                      <input type="hidden" name="challengeId" value={challenge.id} />
-                      
-                      <div className="mb-4">
-                        <label htmlFor="proofText" className="block text-sm font-medium text-gray-700 mb-2">
-                          Add a note (optional)
-                        </label>
-                        <textarea
-                          id="proofText"
-                          name="proofText"
-                          rows={3}
-                          placeholder="How did it go? Any thoughts or details..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                        />
-                      </div>
-                      
-                      <button
-                        type="submit"
-                        className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                      >
-                        ✅ Mark Complete
-                      </button>
-                    </form>
+                  <div className="text-4xl mb-2">
+                    {isFutureChallenge ? '📅' : '⏳'}
+                  </div>
+                  <div className="text-gray-600">
+                    {isFutureChallenge ? 'Scheduled for later' : 'Not completed yet'}
+                  </div>
+                  {canComplete && (
+                    <div className="mt-4">
+                      <EnhancedCompletionForm challengeId={challenge.id} />
+                    </div>
                   )}
                 </div>
               )}
@@ -200,14 +252,59 @@ export default async function ChallengePage({ params }: PageProps) {
                       </div>
                     </div>
                   )}
+                  {buddyCompletion.reflectionNote && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Their reflection:</div>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {buddyCompletion.reflectionNote}
+                      </div>
+                    </div>
+                  )}
+                  {buddyCompletion.feelingTags && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">How they felt:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          try {
+                            const tags = JSON.parse(buddyCompletion.feelingTags)
+                            return (
+                              <>
+                                {tags.difficulty && (
+                                  <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                    Difficulty: {tags.difficulty.replace('_', ' ')}
+                                  </span>
+                                )}
+                                {tags.feeling && (
+                                  <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                    Feeling: {tags.feeling}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          } catch {
+                            // Fallback for old format
+                            return JSON.parse(buddyCompletion.feelingTags).map((tag: string) => (
+                              <span key={tag} className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                {tag}
+                              </span>
+                            ))
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500">
                     Completed {new Date(buddyCompletion.createdAt).toLocaleString()}
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <div className="text-4xl mb-2">⏳</div>
-                  <div className="text-gray-600">Waiting for completion</div>
+                  <div className="text-4xl mb-2">
+                    {isFutureChallenge ? '📅' : '⏳'}
+                  </div>
+                  <div className="text-gray-600">
+                    {isFutureChallenge ? 'Scheduled for later' : 'Waiting for completion'}
+                  </div>
                 </div>
               )}
             </div>
@@ -218,7 +315,7 @@ export default async function ChallengePage({ params }: PageProps) {
             <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
               <div className="text-4xl mb-3">🎉</div>
               <h3 className="text-lg font-semibold text-green-900 mb-2">
-                Great job, both of you completed today's goal!
+                Great job, both of you completed {isFutureChallenge ? "this" : "today's"} goal!
               </h3>
               <p className="text-green-700">
                 Keep up the momentum and stay consistent with your habit building journey.

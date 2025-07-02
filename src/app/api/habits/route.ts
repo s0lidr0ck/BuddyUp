@@ -66,11 +66,11 @@ export async function POST(request: NextRequest) {
       include: {
         partnership: {
           include: {
-            initiator: { select: { id: true, name: true, email: true } },
-            receiver: { select: { id: true, name: true, email: true } }
+            initiator: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
+            receiver: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
           }
         },
-        createdBy: { select: { id: true, name: true, email: true } }
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
       }
     })
 
