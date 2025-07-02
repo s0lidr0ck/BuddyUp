@@ -1,0 +1,29 @@
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/buddyup"
+
+# NextAuth
+NEXTAUTH_SECRET="your-secret-key-here"
+NEXTAUTH_URL="https://your-domain.com"
+
+# AWS S3 (for image uploads)
+AWS_ACCESS_KEY_ID="your-aws-access-key"
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+AWS_REGION="us-east-1"
+AWS_S3_BUCKET_NAME="your-bucket-name"
+
+# PWA Push Notifications (generate with: npx web-push generate-vapid-keys)
+VAPID_PUBLIC_KEY="BDhmKj6coEU9eHaA43HCIOeVl4Vq881JTHx1lnDJv0XOpUwd0ABO--iLQbyTT7Ce18qqZJ1UyQmG3SJRlsCl_KI"
+VAPID_PRIVATE_KEY="eRHqyjc-XeI0EfJvZGOv-eZ-vBmWDbIha4L8S4_uGfo"
+VAPID_EMAIL="mailto:support@your-domain.com"
+NEXT_PUBLIC_VAPID_PUBLIC_KEY="BDhmKj6coEU9eHaA43HCIOeVl4Vq881JTHx1lnDJv0XOpUwd0ABO--iLQbyTT7Ce18qqZJ1UyQmG3SJRlsCl_KI"
+
+# Email (optional - for magic link authentication)
+EMAIL_SERVER_HOST="smtp.gmail.com"
+EMAIL_SERVER_PORT="587"
+EMAIL_SERVER_USER="your-email@gmail.com"
+EMAIL_SERVER_PASSWORD="your-app-password"
+EMAIL_FROM="noreply@your-domain.com"
+
+# Google OAuth (optional)
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret" 
