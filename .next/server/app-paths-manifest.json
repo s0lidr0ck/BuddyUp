@@ -1,5 +1,8 @@
 {
+  "/not-found": "app/not-found.js",
+  "/page": "app/page.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/user/invite-code/route": "app/api/user/invite-code/route.js",
-  "/partnerships/invite/page": "app/partnerships/invite/page.js"
+  "/api/notifications/unread-count/route": "app/api/notifications/unread-count/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/auth/signin/page": "app/auth/signin/page.js"
 }

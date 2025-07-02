@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatUserName } from '@/lib/utils'
 
 interface TimelineItem {
   id: string
@@ -15,7 +16,8 @@ interface ChatTimelineProps {
   currentUserId: string
   buddy: {
     id: string
-    name: string | null
+    firstName: string | null
+    lastName: string | null
     email: string
     image: string | null
   }
@@ -124,13 +126,13 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
     switch (item.type) {
       case 'message':
         return (
-          <div key={item.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-4`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+          <div key={item.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-4 px-2`}>
+            <div className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-3 sm:px-4 py-2 rounded-lg ${
               isCurrentUser 
                 ? 'bg-primary-600 text-white' 
                 : 'bg-white border border-gray-200 text-gray-900'
             }`}>
-              <p className="text-sm">{item.data.content}</p>
+              <p className="text-sm break-words">{item.data.content}</p>
               <p className={`text-xs mt-1 ${
                 isCurrentUser ? 'text-primary-200' : 'text-gray-500'
               }`}>
@@ -142,18 +144,18 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
 
       case 'habit_created':
         return (
-          <div key={item.id} className="flex justify-center mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
+          <div key={item.id} className="flex justify-center mb-6 px-2">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 w-full max-w-md">
               <div className="flex items-center mb-2">
-                <span className="text-blue-600 text-lg mr-2">🎯</span>
+                <span className="text-blue-600 text-lg mr-2 flex-shrink-0">🎯</span>
                 <span className="font-medium text-blue-900">New Habit Proposed</span>
               </div>
               <p className="text-blue-800 text-sm mb-2">
-                <strong>{item.data.createdBy.name || item.data.createdBy.email}</strong> suggested:
+                <strong>{formatUserName(item.data.createdBy)}</strong> suggested:
               </p>
-              <p className="font-semibold text-blue-900">"{item.data.name}"</p>
+              <p className="font-semibold text-blue-900 break-words">"{item.data.name}"</p>
               {item.data.description && (
-                <p className="text-blue-700 text-sm mt-1">{item.data.description}</p>
+                <p className="text-blue-700 text-sm mt-1 break-words">{item.data.description}</p>
               )}
               <p className="text-xs text-blue-600 mt-2">{formatTimeAgo(item.timestamp)}</p>
             </div>
@@ -162,13 +164,13 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
 
       case 'habit_approved':
         return (
-          <div key={item.id} className="flex justify-center mb-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md">
+          <div key={item.id} className="flex justify-center mb-6 px-2">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 w-full max-w-md">
               <div className="flex items-center mb-2">
-                <span className="text-green-600 text-lg mr-2">🎉</span>
+                <span className="text-green-600 text-lg mr-2 flex-shrink-0">🎉</span>
                 <span className="font-medium text-green-900">Habit Approved!</span>
               </div>
-              <p className="text-green-800 text-sm">
+              <p className="text-green-800 text-sm break-words">
                 Started working on "<strong>{item.data.name}</strong>" together
               </p>
               <p className="text-xs text-green-600 mt-2">{formatTimeAgo(item.timestamp)}</p>
@@ -178,45 +180,54 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
 
       case 'goal_set':
         return (
-          <div key={item.id} className="flex justify-center mb-6">
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 max-w-md">
+          <div key={item.id} className="flex justify-center mb-6 px-2">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 w-full max-w-md">
               <div className="flex items-center mb-2">
-                <span className="text-purple-600 text-lg mr-2">🎯</span>
+                <span className="text-purple-600 text-lg mr-2 flex-shrink-0">🎯</span>
                 <span className="font-medium text-purple-900">Goal Set</span>
               </div>
               <p className="text-purple-800 text-sm mb-2">
-                <strong>{item.data.creator.name || item.data.creator.email}</strong> set today's goal:
+                <strong>{item.data.creator.firstName || item.data.creator.email}</strong> set today's goal:
               </p>
-              <p className="font-semibold text-purple-900">"{item.data.title}"</p>
+              <p className="font-semibold text-purple-900 break-words mb-3">"{item.data.title}"</p>
               {item.data.description && (
-                <p className="text-purple-700 text-sm mt-1">{item.data.description}</p>
+                <p className="text-purple-700 text-sm mt-1 mb-3 break-words">{item.data.description}</p>
               )}
-              <p className="text-xs text-purple-600 mt-2">{formatTimeAgo(item.timestamp)}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <p className="text-xs text-purple-600 flex-shrink-0">{formatTimeAgo(item.timestamp)}</p>
+                <a
+                  href={`/challenges/${item.data.id}`}
+                  className="inline-flex items-center justify-center px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <span className="mr-1">👁️</span>
+                  View Goal
+                </a>
+              </div>
             </div>
           </div>
         )
 
       case 'goal_completed':
         return (
-          <div key={item.id} className="flex justify-center mb-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md">
+          <div key={item.id} className="flex justify-center mb-6 px-2">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 w-full max-w-md">
               <div className="flex items-center mb-2">
-                <span className="text-green-600 text-lg mr-2">✅</span>
+                <span className="text-green-600 text-lg mr-2 flex-shrink-0">✅</span>
                 <span className="font-medium text-green-900">Goal Completed!</span>
               </div>
               <p className="text-green-800 text-sm mb-2">
-                <strong>{item.data.user.name || item.data.user.email}</strong> completed:
+                <strong>{item.data.user.firstName || item.data.user.email}</strong> completed:
               </p>
-              <p className="font-semibold text-green-900">"{item.data.challenge.title}"</p>
+              <p className="font-semibold text-green-900 break-words mb-3">"{item.data.challenge.title}"</p>
               
               {item.data.reflectionNote && (
-                <div className="mt-2 p-2 bg-green-100 rounded text-sm">
-                  <p className="text-green-800">💭 "{item.data.reflectionNote}"</p>
+                <div className="mt-2 mb-3 p-2 bg-green-100 rounded text-sm">
+                  <p className="text-green-800 break-words">💭 "{item.data.reflectionNote}"</p>
                 </div>
               )}
               
               {item.data.feelingTags && (
-                <div className="mt-2 flex flex-wrap gap-1">
+                <div className="mt-2 mb-3 flex flex-wrap gap-1">
                   {(() => {
                     try {
                       const tags = JSON.parse(item.data.feelingTags)
@@ -241,7 +252,16 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
                 </div>
               )}
               
-              <p className="text-xs text-green-600 mt-2">{formatTimeAgo(item.timestamp)}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <p className="text-xs text-green-600 flex-shrink-0">{formatTimeAgo(item.timestamp)}</p>
+                <a
+                  href={`/challenges/${item.data.challenge.id}`}
+                  className="inline-flex items-center justify-center px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <span className="mr-1">👁️</span>
+                  View Details
+                </a>
+              </div>
             </div>
           </div>
         )
@@ -260,24 +280,35 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] relative">
+      {/* Floating Close Button - Mobile Only */}
+      <a
+        href="/dashboard"
+        className="fixed top-4 right-4 z-50 w-10 h-10 bg-white border border-gray-300 rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors sm:hidden"
+        aria-label="Close chat"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </a>
+
       {/* Timeline Messages */}
-      <div className="flex-1 overflow-y-auto py-6">
+      <div className="flex-1 overflow-y-auto py-4 sm:py-6">
         {timeline.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-2xl">👋</span>
+          <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center px-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <span className="text-xl sm:text-2xl">👋</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
               Start Your Journey Together!
             </h3>
-            <p className="text-gray-600 mb-6 max-w-md">
-              This is where you and {buddy.name || buddy.email} will track your progress, 
+            <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md">
+              This is where you and {formatUserName(buddy)} will track your progress, 
               share thoughts, and celebrate achievements together.
             </p>
             <button
               onClick={() => setMessage("Hey! Ready to start building some great habits together? 🚀")}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base"
             >
               Send First Message
             </button>
@@ -289,20 +320,20 @@ export default function ChatTimeline({ partnershipId, currentUserId, buddy }: Ch
       </div>
 
       {/* Message Input */}
-      <div className="border-t border-gray-200 bg-white p-4">
-        <form onSubmit={sendMessage} className="flex space-x-4">
+      <div className="border-t border-gray-200 bg-white p-3 sm:p-4">
+        <form onSubmit={sendMessage} className="flex gap-2 sm:gap-4">
           <input
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={`Message ${buddy.name || buddy.email}...`}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Type a message..."
+            className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             disabled={sending}
           />
           <button
             type="submit"
             disabled={!message.trim() || sending}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 sm:px-6 py-2 bg-primary-600 text-white text-sm sm:text-base rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
             {sending ? '...' : 'Send'}
           </button>

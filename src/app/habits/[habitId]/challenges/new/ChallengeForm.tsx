@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/Toast'
 
 interface ChallengeFormProps {
   habitId: string
@@ -10,6 +11,7 @@ interface ChallengeFormProps {
 
 export default function ChallengeForm({ habitId, targetDay = "Today" }: ChallengeFormProps) {
   const router = useRouter()
+  const { addToast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -31,6 +33,7 @@ export default function ChallengeForm({ habitId, targetDay = "Today" }: Challeng
 
       if (response.ok) {
         const data = await response.json()
+        addToast(`${targetDay}'s goal set successfully!`, 'success')
         if (data.challengeId) {
           router.push(`/challenges/${data.challengeId}`)
         } else {
@@ -38,12 +41,12 @@ export default function ChallengeForm({ habitId, targetDay = "Today" }: Challeng
         }
       } else {
         const errorData = await response.json()
-        alert(errorData.error || 'Failed to create challenge')
+        addToast(errorData.error || 'Failed to create challenge', 'error')
         setIsSubmitting(false)
       }
     } catch (error) {
       console.error('Error creating challenge:', error)
-      alert('Failed to create challenge')
+      addToast('Failed to create challenge', 'error')
       setIsSubmitting(false)
     }
   }

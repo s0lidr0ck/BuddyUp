@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useToast } from './Toast'
 
 interface HabitApprovalButtonsProps {
   habitId: string
@@ -9,6 +10,7 @@ interface HabitApprovalButtonsProps {
 
 export default function HabitApprovalButtons({ habitId, onUpdate }: HabitApprovalButtonsProps) {
   const [loading, setLoading] = useState(false)
+  const { addToast } = useToast()
 
   const handleApproval = async (action: 'approve' | 'reject') => {
     setLoading(true)
@@ -23,10 +25,10 @@ export default function HabitApprovalButtons({ habitId, onUpdate }: HabitApprova
         const data = await response.json()
         // Show success message
         const message = action === 'approve' 
-          ? '✅ Habit approved! You can now start building together.'
-          : '❌ Habit declined. Your buddy has been notified.'
+          ? 'Habit approved! You can now start building together.'
+          : 'Habit declined. Your buddy has been notified.'
         
-        alert(message)
+        addToast(message, action === 'approve' ? 'success' : 'info')
         
         if (onUpdate) {
           onUpdate()
@@ -35,11 +37,11 @@ export default function HabitApprovalButtons({ habitId, onUpdate }: HabitApprova
         }
       } else {
         const errorData = await response.json()
-        alert(`Error: ${errorData.error || 'Failed to process approval'}`)
+        addToast(errorData.error || 'Failed to process approval', 'error')
       }
     } catch (error) {
       console.error('Error processing approval:', error)
-      alert('Something went wrong. Please try again.')
+      addToast('Something went wrong. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

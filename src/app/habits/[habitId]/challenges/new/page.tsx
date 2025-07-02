@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
+import { formatUserName } from '@/lib/utils'
 import ChallengeForm from './ChallengeForm'
 
 interface PageProps {
@@ -16,11 +17,11 @@ async function getHabitData(habitId: string, userId: string) {
     include: {
       partnership: {
         include: {
-          initiator: { select: { id: true, name: true, email: true } },
-          receiver: { select: { id: true, name: true, email: true } }
+          initiator: { select: { id: true, firstName: true, lastName: true, email: true } },
+          receiver: { select: { id: true, firstName: true, lastName: true, email: true } }
         }
       },
-      createdBy: { select: { id: true, name: true, email: true } },
+      createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       challenges: {
         where: {
           dueDate: {
@@ -124,10 +125,24 @@ export default async function NewChallengePage({ params }: PageProps) {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Set {targetDay}'s Goal
             </h2>
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
               <span>📝 {habit.name}</span>
-              <span>🤝 with {buddy.name || buddy.email}</span>
-              <span>🔥 {habit.streakCount} day streak</span>
+              <span>🤝 with {formatUserName(buddy)}</span>
+              <span>🔥 {habit.streakCount} points</span>
+            </div>
+            
+            {/* Add clarity about the process */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <div className="text-blue-600 text-lg mr-3">💡</div>
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-1">How this works</h4>
+                  <p className="text-blue-800 text-sm">
+                    You're setting {targetDay.toLowerCase()}'s goal for your <strong>{habit.name}</strong> habit with <strong>{formatUserName(buddy)}</strong>. 
+                    After you both complete {targetDay.toLowerCase()}'s goal, the other person will set the next day's goal.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

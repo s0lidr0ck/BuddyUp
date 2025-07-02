@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useToast } from '@/components/Toast'
+import { formatUserName } from '@/lib/utils'
 
 const HABIT_CATEGORIES = [
   { id: 'Faith', name: 'Faith', emoji: '🙏', description: 'Spiritual growth and practices' },
@@ -34,6 +36,7 @@ export default function NewHabitPage() {
   const params = useParams()
   const router = useRouter()
   const { data: session } = useSession()
+  const { addToast } = useToast()
   const [partnership, setPartnership] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -110,7 +113,7 @@ export default function NewHabitPage() {
 
       if (response.ok) {
         // Show success message and redirect
-        alert('Habit created! Your buddy will need to approve it before you can start building together.')
+        addToast('Habit created! Your buddy will need to approve it before you can start building together.', 'success')
         router.push('/dashboard')
         router.refresh()
       } else {
@@ -136,7 +139,7 @@ export default function NewHabitPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create a New Habit</h1>
           {buddy && (
             <p className="text-gray-600">
-              You and <span className="font-medium">{buddy.name || buddy.email}</span> will work on this together!
+              You and <span className="font-medium">{formatUserName(buddy)}</span> will work on this together!
             </p>
           )}
         </div>

@@ -70,9 +70,9 @@ export async function POST(
       where: { id: params.habitId },
       data: { 
         status: newStatus,
-        // If approved, set the start date to today and give the approver the first turn
+        // If approved, set the start date to today and give the CREATOR the first turn
         startDate: action === 'approve' ? new Date() : undefined,
-        currentTurn: action === 'approve' ? session.user.id : undefined
+        currentTurn: action === 'approve' ? habit.createdById : undefined
       },
       include: {
         partnership: {

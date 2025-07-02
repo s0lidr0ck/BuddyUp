@@ -2,8 +2,10 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import { formatUserName } from '@/lib/utils'
 import ActivityFeed from '@/components/ActivityFeed'
 import ConnectionStatus from '@/components/ConnectionStatus'
+import NotificationBell from '@/components/NotificationBell'
 
 async function getDashboardData(userId: string) {
   const [user, partnerships, totalChallenges, pendingHabitApprovals, myPendingHabits, recentlyDeclinedHabits, activeChallenges] = await Promise.all([
@@ -154,176 +156,102 @@ function createActivityFeed(data: any, userId: string) {
     })
   })
 
-  // 2. Group active challenges by buddy (high priority) - show only most relevant challenge per habit
-  const challengesByBuddy = new Map()
-  const buddiesWithChallenges = new Set() // Track which buddies have challenge cards
+  // 2. Group all active habits by buddy (simplified approach)
+  const habitsByBuddy = new Map()
   
-  // First, group challenges by habit
-  const challengesByHabit = new Map()
-  data.activeChallenges.forEach((challenge: any) => {
-    const habitId = challenge.habit.id
-    if (!challengesByHabit.has(habitId)) {
-      challengesByHabit.set(habitId, [])
-    }
-    challengesByHabit.get(habitId).push(challenge)
-  })
-  
-  // For each habit, select the most relevant challenge
-  challengesByHabit.forEach((challenges, habitId) => {
-    const today = new Date().toDateString()
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+  const activePartnerships = data.partnerships.filter((p: any) => p.status === 'ACTIVE')
+  activePartnerships.forEach((partnership: any) => {
+    const activeHabits = partnership.habits.filter((h: any) => h.status === 'ACTIVE')
     
-    // Sort challenges by due date
-    challenges.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    
-    let selectedChallenge = null
-    
-    // Priority 1: Find current uncompleted challenge
-    const currentUncompleted = challenges.find((c: any) => {
-      const challengeDate = new Date(c.dueDate).toDateString()
-      const userCompleted = c.completions.some((comp: any) => comp.userId === userId)
-      return challengeDate <= today && !userCompleted
-    })
-    
-    if (currentUncompleted) {
-      selectedChallenge = currentUncompleted
-    } else {
-      // Priority 2: If today is completed, show tomorrow's challenge
-      const todaysChallenge = challenges.find((c: any) => new Date(c.dueDate).toDateString() === today)
-      const userCompletedToday = todaysChallenge?.completions.some((comp: any) => comp.userId === userId)
-      
-      if (userCompletedToday) {
-        const tomorrowsChallenge = challenges.find((c: any) => new Date(c.dueDate).toDateString() === tomorrow)
-        if (tomorrowsChallenge) {
-          selectedChallenge = tomorrowsChallenge
-        }
-      }
-      
-      // Priority 3: Show most recent completed challenge as fallback
-      if (!selectedChallenge) {
-        selectedChallenge = challenges[challenges.length - 1] // Most recent
-      }
-    }
-    
-    if (selectedChallenge) {
-      const buddy = selectedChallenge.habit.partnership.initiatorId === userId 
-        ? selectedChallenge.habit.partnership.receiver 
-        : selectedChallenge.habit.partnership.initiator
-      
-      const userCompletedChallenge = selectedChallenge.completions.some((c: any) => c.userId === userId)
+    if (activeHabits.length > 0) {
+      const buddy = partnership.initiatorId === userId ? partnership.receiver : partnership.initiator
       const buddyKey = buddy.id
       
-      // Track that this buddy has challenge cards
-      buddiesWithChallenges.add(buddyKey)
-      
-      if (!challengesByBuddy.has(buddyKey)) {
-        challengesByBuddy.set(buddyKey, {
+      if (!habitsByBuddy.has(buddyKey)) {
+        habitsByBuddy.set(buddyKey, {
           buddy,
-          challenges: []
+          habits: []
         })
       }
-      challengesByBuddy.get(buddyKey).challenges.push({
-        ...selectedChallenge,
-        userCompleted: userCompletedChallenge
+      
+      // Add all active habits for this buddy
+      activeHabits.forEach((habit: any) => {
+        // Find today's and tomorrow's challenges for this habit
+        const today = new Date().toDateString()
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+        
+        const todaysChallenge = data.activeChallenges.find((challenge: any) => 
+          challenge.habit.id === habit.id && 
+          new Date(challenge.dueDate).toDateString() === today
+        )
+        
+        const tomorrowsChallenge = data.activeChallenges.find((challenge: any) => 
+          challenge.habit.id === habit.id && 
+          new Date(challenge.dueDate).toDateString() === tomorrow
+        )
+        
+        // Check completion status
+        const userCompleted = todaysChallenge ? 
+          todaysChallenge.completions.some((c: any) => c.userId === userId) : false
+        const buddyCompleted = todaysChallenge ? 
+          todaysChallenge.completions.some((c: any) => c.userId === buddy.id) : false
+        
+        // Determine what action is needed
+        let actionNeeded = 'WAITING'
+        let isSettingTomorrow = false
+        
+        if (habit.currentTurn === userId) {
+          if (!todaysChallenge) {
+            // No challenge today - can set today's goal
+            actionNeeded = 'SET_GOAL'
+            isSettingTomorrow = false
+          } else if (userCompleted && buddyCompleted && !tomorrowsChallenge) {
+            // Both completed today, no tomorrow challenge yet - can set tomorrow's goal
+            actionNeeded = 'SET_GOAL'
+            isSettingTomorrow = true
+          }
+        } else if (todaysChallenge && !userCompleted) {
+          // There's a challenge today and user hasn't completed it
+          actionNeeded = 'COMPLETE_GOAL'
+        }
+        
+        habitsByBuddy.get(buddyKey).habits.push({
+          ...habit,
+          partnership,
+          buddy,
+          todaysChallenge,
+          tomorrowsChallenge,
+          userCompleted,
+          buddyCompleted,
+          actionNeeded,
+          isSettingTomorrow,
+          // Add preview info for tomorrow's challenge
+          tomorrowPreview: tomorrowsChallenge ? {
+            title: tomorrowsChallenge.title,
+            description: tomorrowsChallenge.description,
+            creator: tomorrowsChallenge.creator
+          } : null
+        })
       })
     }
   })
 
-  // Create a single activity for each buddy with their selected challenges
-  challengesByBuddy.forEach((group, buddyId) => {
-    const latestChallenge = group.challenges.reduce((latest: any, current: any) => 
-      new Date(current.dueDate) > new Date(latest.dueDate) ? current : latest
-    )
-    
+  // Create activity for each buddy with all their habits
+  habitsByBuddy.forEach((group, buddyId) => {
     activities.push({
-      id: `challenges-${buddyId}`,
-      type: 'challenges_completion',
-      timestamp: new Date(latestChallenge.dueDate),
+      id: `buddy-habits-${buddyId}`,
+      type: 'buddy_habits',
+      timestamp: new Date(Math.max(...group.habits.map((h: any) => new Date(h.updatedAt).getTime()))),
       priority: 2,
       data: {
         buddy: group.buddy,
-        challenges: group.challenges,
-        streakCount: group.challenges[0]?.habit?.streakCount || 0
+        habits: group.habits,
+        totalHabits: group.habits.length
       }
     })
   })
 
-  // 3. Goals needed (medium priority)
-  const activePartnerships = data.partnerships.filter((p: any) => p.status === 'ACTIVE')
-  activePartnerships.forEach((partnership: any) => {
-    const activeHabits = partnership.habits.filter((h: any) => h.status === 'ACTIVE')
-    activeHabits.forEach((habit: any) => {
-      const buddy = partnership.initiatorId === userId ? partnership.receiver : partnership.initiator
-      
-      // Skip if we already have challenge cards for this buddy
-      if (buddiesWithChallenges.has(buddy.id)) {
-        return
-      }
-      
-      // Find today's and tomorrow's challenges for this habit
-      const today = new Date().toDateString()
-      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
-      
-      const todaysChallenge = data.activeChallenges.find((challenge: any) => 
-        challenge.habit.id === habit.id && 
-        new Date(challenge.dueDate).toDateString() === today
-      )
-      
-      const tomorrowsChallenge = data.activeChallenges.find((challenge: any) => 
-        challenge.habit.id === habit.id && 
-        new Date(challenge.dueDate).toDateString() === tomorrow
-      )
-      
-      // Check if user has completed today's challenge
-      const userCompletedToday = todaysChallenge && 
-        todaysChallenge.completions.some((c: any) => c.userId === userId)
-      
-      // Check if there are any incomplete challenges for this habit that the user hasn't completed
-      const habitHasIncompleteChallenge = data.activeChallenges.some((challenge: any) => 
-        challenge.habit.id === habit.id && 
-        !challenge.completions.some((c: any) => c.userId === userId)
-      )
-      
-      // Show goal setting option if it's user's turn and appropriate conditions are met
-      if (habit.currentTurn === userId) {
-        // Case 1: No challenge today - can set today's goal
-        if (!todaysChallenge) {
-          activities.push({
-            id: `goal-${habit.id}`,
-            type: 'goal_needed',
-            timestamp: new Date(habit.updatedAt),
-            priority: 3,
-            data: {
-              ...habit,
-              buddy,
-              isSettingTomorrow: false
-            }
-          })
-        }
-        // Case 2: Completed today, no tomorrow challenge yet - can set tomorrow's goal
-        else if (userCompletedToday && !tomorrowsChallenge) {
-          activities.push({
-            id: `goal-${habit.id}`,
-            type: 'goal_needed',
-            timestamp: new Date(habit.updatedAt),
-            priority: 3,
-            data: {
-              ...habit,
-              buddy,
-              isSettingTomorrow: true
-            }
-          })
-        }
-        // Case 3: Has incomplete challenge - show as waiting
-        else if (habitHasIncompleteChallenge) {
-          // Don't show goal setting if user has incomplete challenges
-        }
-      }
-      // Note: Removed goal_waiting activities since challenge cards now cover this
-    })
-  })
-
-  // 4. Pending buddy invites (medium priority)
+  // 3. Pending buddy invites (medium priority)
   const pendingPartnerships = data.partnerships.filter((p: any) => p.status === 'PENDING')
   pendingPartnerships.forEach((partnership: any) => {
     const isInviteReceived = partnership.receiverId === userId
@@ -333,13 +261,43 @@ function createActivityFeed(data: any, userId: string) {
         id: `invite-${partnership.id}`,
         type: 'buddy_invite',
         timestamp: new Date(partnership.createdAt),
-        priority: 4,
+        priority: 3,
         data: {
           partnership,
           buddy
         }
       })
     }
+  })
+
+  // 4. Recent pass notifications (medium priority)
+  activePartnerships.forEach((partnership: any) => {
+    const activeHabits = partnership.habits.filter((h: any) => h.status === 'ACTIVE')
+    activeHabits.forEach((habit: any) => {
+      // Show pass notification if someone passed in the last 2 hours and it's now your turn
+      if (habit.lastPassedBy && habit.passedAt && habit.currentTurn === userId) {
+        const passedAt = new Date(habit.passedAt)
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+        
+        if (passedAt > twoHoursAgo) {
+          const passer = partnership.initiatorId === habit.lastPassedBy 
+            ? partnership.initiator 
+            : partnership.receiver
+          
+          activities.push({
+            id: `pass-${habit.id}`,
+            type: 'turn_passed',
+            timestamp: passedAt,
+            priority: 3,
+            data: {
+              ...habit,
+              passer,
+              buddy: partnership.initiatorId === userId ? partnership.receiver : partnership.initiator
+            }
+          })
+        }
+      }
+    })
   })
 
   // 5. My pending habits (lower priority)
@@ -352,7 +310,7 @@ function createActivityFeed(data: any, userId: string) {
       id: `pending-${habit.id}`,
       type: 'habit_pending',
       timestamp: new Date(habit.createdAt),
-      priority: 5,
+      priority: 4,
       data: {
         ...habit,
         buddy
@@ -370,7 +328,7 @@ function createActivityFeed(data: any, userId: string) {
       id: `declined-${habit.id}`,
       type: 'habit_declined',
       timestamp: new Date(habit.updatedAt),
-      priority: 6,
+      priority: 5,
       data: {
         ...habit,
         buddy
@@ -416,6 +374,21 @@ export default async function DashboardPage() {
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Welcome back, {user?.firstName || 'there'}!</span>
+              <NotificationBell />
+              <a 
+                href="/buddies"
+                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                title="Manage Buddies"
+              >
+                👥
+              </a>
+              <a 
+                href="/account"
+                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                title="Account Settings"
+              >
+                ⚙️
+              </a>
               {user?.profilePicture ? (
                 <img 
                   src={user.profilePicture} 
@@ -449,22 +422,25 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-primary-600">{totalActiveHabits}</div>
-            <div className="text-sm text-gray-600">Active Habits</div>
-            {activePartnerships.length > 0 && (
-              <div className="text-xs text-gray-400 mt-1">with {activePartnerships.length} buddy{activePartnerships.length !== 1 ? 'ies' : ''}</div>
-            )}
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-green-600">{maxStreak}</div>
-            <div className="text-sm text-gray-600">Best Streak</div>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-2xl font-bold text-purple-600">{data.totalChallenges}</div>
-            <div className="text-sm text-gray-600">Goals Completed</div>
+        {/* Stats Cards - Compact Mobile Design */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-xl sm:text-2xl font-bold text-primary-600">{totalActiveHabits}</div>
+              <div className="text-xs sm:text-sm text-gray-600">Active Habits</div>
+              {activePartnerships.length > 0 && (
+                <div className="text-xs text-gray-400 mt-1 hidden sm:block">with {activePartnerships.length} buddy{activePartnerships.length !== 1 ? 'ies' : ''}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-bold text-green-600">{maxStreak}</div>
+              <div className="text-xs sm:text-sm text-gray-600">Best Streak</div>
+              <div className="text-xs text-gray-400 mt-1">points</div>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-bold text-purple-600">{data.totalChallenges}</div>
+              <div className="text-xs sm:text-sm text-gray-600">Goals Done</div>
+            </div>
           </div>
         </div>
 
@@ -485,50 +461,6 @@ export default async function DashboardPage() {
               <span className="mr-2">👋</span>
               Invite Your First Buddy
             </a>
-          </div>
-        )}
-
-        {/* Debug: All Active Habits */}
-        {allActiveHabits.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-            <h3 className="font-semibold text-yellow-900 mb-4">Debug: All Your Active Habits ({allActiveHabits.length})</h3>
-            <div className="space-y-3">
-              {allActiveHabits.map((habit: any) => {
-                const partnership = activePartnerships.find((p: any) => p.id === habit.partnershipId)
-                const buddy = partnership?.initiatorId === session.user.id ? partnership?.receiver : partnership?.initiator
-                return (
-                  <div key={habit.id} className="bg-white rounded p-3 border border-yellow-300">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <strong className="text-gray-900">{habit.name}</strong>
-                        <p className="text-sm text-gray-600">with {buddy?.name || buddy?.email}</p>
-                        <p className="text-xs text-gray-500">
-                          Turn: {habit.currentTurn === session.user.id ? 'Your turn' : 'Buddy\'s turn'} | 
-                          Streak: {habit.streakCount} | 
-                          Status: {habit.status}
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <a
-                          href={`/partnerships/${habit.partnershipId}/chat`}
-                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
-                        >
-                          💬 Chat
-                        </a>
-                        {habit.currentTurn === session.user.id && (
-                          <a
-                            href={`/habits/${habit.id}/challenges/new`}
-                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded"
-                          >
-                            🎯 Set Goal
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           </div>
         )}
 

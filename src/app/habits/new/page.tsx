@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { formatUserName } from '@/lib/utils'
 
 export default function ChooseBuddyPage() {
   const router = useRouter()
@@ -99,7 +100,7 @@ export default function ChooseBuddyPage() {
                     <div className="w-12 h-12 bg-gray-300 rounded-full mr-4"></div>
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        {buddy.name || buddy.email}
+                        {formatUserName(buddy)}
                       </h3>
                       <p className="text-sm text-gray-600">
                         {activeHabits.length === 0 

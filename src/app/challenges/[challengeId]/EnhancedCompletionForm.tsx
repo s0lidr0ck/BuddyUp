@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import TaskPhotoUpload from '@/components/TaskPhotoUpload'
 
 interface EnhancedCompletionFormProps {
   challengeId: string
@@ -31,7 +32,7 @@ export default function EnhancedCompletionForm({ challengeId }: EnhancedCompleti
   const [selectedMoods, setSelectedMoods] = useState<string[]>([])
   const [reflectionNote, setReflectionNote] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState(REFLECTION_PROMPTS[0])
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStep, setCurrentStep] = useState<'mood' | 'reflection' | 'photo' | 'summary'>('mood')
 
@@ -43,30 +44,26 @@ export default function EnhancedCompletionForm({ challengeId }: EnhancedCompleti
     )
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPhotoFile(file)
-    }
+  const handlePhotoUpload = (url: string) => {
+    setPhotoUrl(url)
   }
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
     
     try {
-      const formData = new FormData()
-      formData.append('challengeId', challengeId)
-      formData.append('reflectionNote', reflectionNote)
-      formData.append('feelingTags', JSON.stringify(selectedMoods))
-      formData.append('reflectionPrompt', selectedPrompt)
-      
-      if (photoFile) {
-        formData.append('photo', photoFile)
+      const payload = {
+        challengeId,
+        reflectionNote,
+        feelingTags: JSON.stringify(selectedMoods),
+        reflectionPrompt: selectedPrompt,
+        photoUrl: photoUrl || undefined
       }
 
       const response = await fetch('/api/challenges/complete', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
@@ -187,45 +184,10 @@ export default function EnhancedCompletionForm({ challengeId }: EnhancedCompleti
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add a photo (optional)</h3>
             <p className="text-gray-600 mb-6">Share a photo of your accomplishment or progress</p>
             
-            {photoFile ? (
-              <div className="text-center">
-                <div className="inline-block p-4 border-2 border-dashed border-green-300 rounded-lg bg-green-50">
-                  <div className="text-green-600 mb-2">
-                    <svg className="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-green-700 font-medium">{photoFile.name}</p>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoFile(null)}
-                    className="text-xs text-green-600 hover:text-green-700 mt-2"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                <label className="cursor-pointer">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-gray-400 transition-colors">
-                    <div className="text-gray-400 mb-4">
-                      <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <p className="text-gray-600 font-medium">Upload a photo</p>
-                    <p className="text-sm text-gray-500 mt-1">PNG, JPG up to 10MB</p>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            )}
+            <TaskPhotoUpload
+              onPhotoSelect={handlePhotoUpload}
+              currentPhoto={photoUrl}
+            />
           </div>
         )}
 
@@ -254,10 +216,10 @@ export default function EnhancedCompletionForm({ challengeId }: EnhancedCompleti
                 </div>
               </div>
               
-              {photoFile && (
+              {photoUrl && (
                 <div>
                   <div className="text-sm font-medium text-gray-700 mb-2">Photo:</div>
-                  <div className="text-sm text-green-600">📸 {photoFile.name}</div>
+                  <div className="text-sm text-green-600">📸 Photo attached</div>
                 </div>
               )}
             </div>

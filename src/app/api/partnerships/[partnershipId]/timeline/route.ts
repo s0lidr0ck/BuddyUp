@@ -24,8 +24,8 @@ export async function GET(
         ]
       },
       include: {
-        initiator: { select: { id: true, name: true, email: true, image: true } },
-        receiver: { select: { id: true, name: true, email: true, image: true } }
+        initiator: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
+        receiver: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
       }
     })
 
@@ -39,7 +39,7 @@ export async function GET(
       prisma.message.findMany({
         where: { partnershipId: params.partnershipId },
         include: {
-          sender: { select: { id: true, name: true, email: true, image: true } }
+          sender: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
         }
       }),
       
@@ -47,7 +47,7 @@ export async function GET(
       prisma.habit.findMany({
         where: { partnershipId: params.partnershipId },
         include: {
-          createdBy: { select: { id: true, name: true, email: true, image: true } }
+          createdBy: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
         }
       }),
       
@@ -57,7 +57,7 @@ export async function GET(
           habit: { partnershipId: params.partnershipId }
         },
         include: {
-          creator: { select: { id: true, name: true, email: true, image: true } },
+          creator: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
           habit: { select: { id: true, name: true } }
         }
       }),
@@ -70,7 +70,7 @@ export async function GET(
           }
         },
         include: {
-          user: { select: { id: true, name: true, email: true, image: true } },
+          user: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
           challenge: {
             include: {
               habit: { select: { id: true, name: true } }

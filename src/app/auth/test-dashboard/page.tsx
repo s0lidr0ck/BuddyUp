@@ -108,7 +108,7 @@ export default function TestDashboardPage() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
             <div className="text-2xl font-bold text-green-600">0</div>
-            <div className="text-sm text-gray-600">Day Streak</div>
+            <div className="text-sm text-gray-600">Points</div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
             <div className="text-2xl font-bold text-purple-600">0</div>

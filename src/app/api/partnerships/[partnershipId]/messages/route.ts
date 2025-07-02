@@ -34,7 +34,7 @@ export async function GET(
       where: { partnershipId: params.partnershipId },
       include: {
         sender: {
-          select: { id: true, name: true, email: true, image: true }
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true }
         }
       },
       orderBy: { createdAt: 'asc' }
@@ -92,7 +92,7 @@ export async function POST(
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true, image: true }
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true }
         }
       }
     })

@@ -1,0 +1,46 @@
+{
+  "name": "BuddyUp - Accountability Made Simple",
+  "short_name": "BuddyUp",
+  "description": "A friendly accountability platform that turns good intentions into daily reality—one trusted relationship at a time.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["productivity", "lifestyle", "social"],
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your accountability dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "My Buddies",
+      "short_name": "Buddies",
+      "description": "Manage your accountability buddies",
+      "url": "/buddies"
+    }
+  ],
+  "permissions": [
+    "notifications",
+    "background-sync"
+  ],
+  "prefer_related_applications": false
+} 

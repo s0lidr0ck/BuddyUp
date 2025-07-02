@@ -48,15 +48,24 @@ export async function GET(request: NextRequest) {
     }
 
     const challenges = await prisma.challenge.findMany({
-      where: { partnershipId },
+      where: { 
+        habit: {
+          partnershipId: partnershipId
+        }
+      },
       include: {
         creator: {
-          select: { id: true, name: true, email: true, image: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
+        },
+        habit: {
+          include: {
+            partnership: true
+          }
         },
         completions: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, image: true },
+              select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
             },
           },
         },
@@ -92,7 +101,12 @@ export async function POST(request: Request) {
     const habit = await prisma.habit.findUnique({
       where: { id: habitId },
       include: {
-        partnership: true
+        partnership: {
+          include: {
+            initiator: { select: { id: true, firstName: true, lastName: true, email: true } },
+            receiver: { select: { id: true, firstName: true, lastName: true, email: true } }
+          }
+        }
       }
     })
 
@@ -100,7 +114,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Habit not found' }, { status: 404 })
     }
 
-    // Check if user is part of this habit
+    // Check if user is part of this habit AND if it's their turn
     const isParticipant = 
       habit.createdById === session.user.id ||
       habit.partnership.initiatorId === session.user.id ||
@@ -108,6 +122,21 @@ export async function POST(request: Request) {
 
     if (!isParticipant || habit.status !== 'ACTIVE') {
       return Response.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    // NEW: Check if it's the user's turn to set a goal
+    if (habit.currentTurn !== session.user.id) {
+      const otherPerson = habit.partnership.initiatorId === session.user.id 
+        ? habit.partnership.receiver 
+        : habit.partnership.initiator
+      const otherPersonName = (otherPerson.firstName && otherPerson.lastName) 
+        ? `${otherPerson.firstName} ${otherPerson.lastName}`
+        : otherPerson.firstName || otherPerson.email
+      
+      return Response.json({ 
+        error: `It's ${otherPersonName}'s turn to set the next goal`,
+        notYourTurn: true 
+      }, { status: 400 })
     }
 
     // Check if there's already a challenge for today or if we should create tomorrow's challenge
@@ -223,7 +252,7 @@ export async function POST(request: Request) {
       }
     })
 
-    // Switch turn to the other person immediately so they know they'll set tomorrow's goal
+    // Switch turn to the other person for tomorrow's goal setting
     const nextTurn = habit.partnership.initiatorId === session.user.id 
       ? habit.partnership.receiverId 
       : habit.partnership.initiatorId
@@ -259,15 +288,21 @@ export async function PATCH(request: NextRequest) {
     const challenge = await prisma.challenge.findFirst({
       where: {
         id: data.challengeId,
-        partnership: {
-          OR: [
-            { initiatorId: session.user.id },
-            { receiverId: session.user.id },
-          ],
+        habit: {
+          partnership: {
+            OR: [
+              { initiatorId: session.user.id },
+              { receiverId: session.user.id },
+            ],
+          },
         },
       },
       include: {
-        partnership: true,
+        habit: {
+          include: {
+            partnership: true
+          }
+        }
       },
     })
 
@@ -299,19 +334,15 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
-    // Update partnership turn and streak
-    const otherUserId = challenge.partnership.initiatorId === session.user.id
-      ? challenge.partnership.receiverId
-      : challenge.partnership.initiatorId
-
-    await prisma.partnership.update({
-      where: { id: challenge.partnershipId },
+    // Update habit streak (not partnership - partnerships don't have currentTurn or streakCount)
+    await prisma.habit.update({
+      where: { id: challenge.habit.id },
       data: {
-        currentTurn: otherUserId,
         streakCount: data.status === 'COMPLETED' 
           ? { increment: 1 }
           : { set: 0 },
         totalDays: { increment: 1 },
+        updatedAt: new Date()
       },
     })
 

@@ -55,4 +55,12 @@ export function calculateStreak(completions: Array<{ completedAt: Date, status: 
   }
   
   return streak
+}
+
+// Utility function to format user names consistently
+export function formatUserName(user: { firstName?: string | null, lastName?: string | null, email: string }) {
+  if (user.firstName || user.lastName) {
+    return [user.firstName, user.lastName].filter(Boolean).join(' ').trim()
+  }
+  return user.email
 } 

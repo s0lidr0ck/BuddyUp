@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import EnhancedCompletionForm from '@/components/EnhancedCompletionForm'
+import { formatUserName } from '@/lib/utils'
 
 interface PageProps {
   params: {
@@ -14,20 +15,20 @@ async function getChallengeData(challengeId: string, userId: string) {
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
     include: {
-      creator: { select: { id: true, name: true, email: true } },
+      creator: { select: { id: true, firstName: true, lastName: true, email: true } },
       habit: {
         include: {
           partnership: {
             include: {
-              initiator: { select: { id: true, name: true, email: true } },
-              receiver: { select: { id: true, name: true, email: true } }
+              initiator: { select: { id: true, firstName: true, lastName: true, email: true } },
+              receiver: { select: { id: true, firstName: true, lastName: true, email: true } }
             }
           }
         }
       },
       completions: {
         include: {
-          user: { select: { id: true, name: true, email: true } }
+          user: { select: { id: true, firstName: true, lastName: true, email: true } }
         }
       }
     }
@@ -131,8 +132,8 @@ export default async function ChallengePage({ params }: PageProps) {
             
             <div className="flex items-center space-x-4 text-sm text-gray-600">
               <span>📝 {challenge.habit.name}</span>
-              <span>👤 Created by {isCreator ? 'You' : challenge.creator.name || challenge.creator.email}</span>
-              <span>🤝 with {buddy.name || buddy.email}</span>
+              <span>👤 Created by {isCreator ? 'You' : formatUserName(challenge.creator)}</span>
+              <span>🤝 with {formatUserName(buddy)}</span>
             </div>
           </div>
 
@@ -236,7 +237,7 @@ export default async function ChallengePage({ params }: PageProps) {
             {/* Buddy's Progress */}
             <div className="border border-gray-200 rounded-lg p-4">
               <h4 className="font-semibold text-gray-900 mb-3">
-                {buddy.name || buddy.email}'s Progress
+                {formatUserName(buddy)}'s Progress
               </h4>
               {buddyCompletion ? (
                 <div className="space-y-3">

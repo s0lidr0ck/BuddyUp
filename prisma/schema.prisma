@@ -79,6 +79,11 @@ model User {
   // Nudges
   sentNudges        Nudge[] @relation("NudgeSender")
   receivedNudges    Nudge[] @relation("NudgeReceiver")
+  
+  // Notifications
+  notifications     Notification[]
+  notificationSubscriptions NotificationSubscription[]
+  notificationPreferences   NotificationPreferences?
 }
 
 model VerificationToken {
@@ -126,6 +131,11 @@ model Habit {
   totalDays     Int         @default(0)
   mulligansUsed Int         @default(0)
   maxMulligans  Int         @default(1)
+  
+  // Pass functionality
+  lastPassedBy  String?     // User ID who last passed their turn
+  passedAt      DateTime?   // When the last pass happened
+  passCount     Int         @default(0) // Total number of passes for this habit
   
   // Notification tracking
   dismissedAt   DateTime?   // When user dismissed a declined habit notification
@@ -257,6 +267,77 @@ model UserBadge {
   @@unique([userId, badgeId])
 }
 
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  data        String?          // JSON data for action buttons, deep links, etc.
+  read        Boolean          @default(false)
+  actionUrl   String?          // Deep link URL for when notification is clicked
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?
+  
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model NotificationSubscription {
+  id          String    @id @default(cuid())
+  userId      String
+  endpoint    String    @unique
+  p256dh      String    // Push subscription key
+  auth        String    // Push subscription auth
+  userAgent   String?   // Browser/device info
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  lastUsed    DateTime  @default(now())
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+model NotificationPreferences {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  
+  // In-app notifications
+  inAppEnabled          Boolean @default(true)
+  
+  // Push notifications  
+  pushEnabled           Boolean @default(true)
+  buddyInvites          Boolean @default(true)
+  goalCompleted         Boolean @default(true)
+  goalSet               Boolean @default(true)
+  habitApproval         Boolean @default(true)
+  newMessages           Boolean @default(true)
+  streakReminders       Boolean @default(true)
+  weeklyProgress        Boolean @default(true)
+  
+  // Email notifications
+  emailEnabled          Boolean @default(true)
+  emailBuddyInvites     Boolean @default(true)
+  emailWeeklyDigest     Boolean @default(true)
+  emailStreakReminders  Boolean @default(false)
+  
+  // Timing preferences
+  quietHoursStart       String? // "22:00" format
+  quietHoursEnd         String? // "08:00" format
+  timezone              String  @default("UTC")
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 // Enums
 enum PartnershipStatus {
   PENDING
@@ -311,4 +392,20 @@ enum BadgeCategory {
   MILESTONE
   ENCOURAGEMENT
   SPECIAL
+}
+
+enum NotificationType {
+  BUDDY_INVITE_RECEIVED
+  BUDDY_INVITE_ACCEPTED
+  GOAL_SET_FOR_YOU
+  GOAL_COMPLETED_BY_BUDDY
+  HABIT_NEEDS_APPROVAL
+  HABIT_APPROVED
+  HABIT_REJECTED
+  NEW_MESSAGE
+  STREAK_REMINDER
+  WEEKLY_PROGRESS
+  TURN_TO_SET_GOAL
+  PARTNERSHIP_PAUSED
+  PARTNERSHIP_RESUMED
 } 
