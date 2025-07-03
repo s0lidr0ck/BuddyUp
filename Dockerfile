@@ -20,10 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+
+# Copy package files and install ALL dependencies (not just production)
+COPY package.json package-lock.json* ./
+RUN npm ci && npm cache clean --force
+
 COPY . .
 
-# Generate Prisma Client
+# Generate Prisma Client for Debian environment
 RUN npx prisma generate
 
 # Build the application
@@ -49,7 +53,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy Prisma schema and generated client
+# Copy Prisma schema and generated client (from Debian-built environment)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
