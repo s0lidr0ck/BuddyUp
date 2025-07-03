@@ -53,14 +53,13 @@ export async function POST(request: Request) {
     }
 
     // Check if challenge is due (can't complete future challenges)
-    const today = new Date()
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const challengeDueDate = new Date(challenge.dueDate)
+    const challengeDateStart = new Date(challengeDueDate.getFullYear(), challengeDueDate.getMonth(), challengeDueDate.getDate())
     
-    // Set both to start of day for accurate comparison
-    today.setHours(0, 0, 0, 0)
-    challengeDueDate.setHours(0, 0, 0, 0)
-    
-    if (challengeDueDate > today) {
+    // Compare normalized dates (start of day only)
+    if (challengeDateStart > todayStart) {
       return Response.json({ 
         error: 'Cannot complete future challenges. This goal is due on ' + challengeDueDate.toLocaleDateString(),
         isFutureChallenge: true 

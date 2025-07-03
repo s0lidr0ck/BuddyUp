@@ -505,14 +505,17 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
                 {/* Challenge list with competitive status indicators */}
                 <div className="space-y-2 mb-4">
                   {data.challenges.map((challenge: any, index: number) => {
-                    const today = new Date().toDateString()
-                    const challengeDate = new Date(challenge.dueDate).toDateString()
-                    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+                    const now = new Date()
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                    const tomorrowStart = new Date(todayStart)
+                    tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+                    const challengeDate = new Date(challenge.dueDate)
+                    const challengeDateStart = new Date(challengeDate.getFullYear(), challengeDate.getMonth(), challengeDate.getDate())
                     
-                    const isToday = challengeDate === today
-                    const isTomorrow = challengeDate === tomorrow
-                    const isFuture = new Date(challenge.dueDate) > new Date(tomorrow)
-                    const isPast = new Date(challenge.dueDate) < new Date(today)
+                    const isToday = challengeDateStart.getTime() === todayStart.getTime()
+                    const isTomorrow = challengeDateStart.getTime() === tomorrowStart.getTime()
+                    const isFuture = challengeDateStart > tomorrowStart
+                    const isPast = challengeDateStart < todayStart
                     const userCompleted = challenge.userCompleted
                     const buddyCompleted = challenge.buddyCompleted
                     
@@ -540,9 +543,9 @@ export default function ActivityFeed({ activities: initialActivities, currentUse
                       statusIcon = '✅'
                       statusText = 'You completed'
                     } else if (isPast) {
-                      statusColor = 'red'
-                      statusIcon = '⏰'
-                      statusText = 'Overdue'
+                      statusColor = 'green'
+                      statusIcon = '📝'
+                      statusText = 'Available'
                       canComplete = true
                     } else if (isToday) {
                       statusColor = 'yellow'

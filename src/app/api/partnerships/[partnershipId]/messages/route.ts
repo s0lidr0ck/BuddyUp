@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { NotificationHelpers } from '@/lib/notifications'
+import { formatUserName } from '@/lib/utils'
 
 export async function GET(
   request: NextRequest,
@@ -66,7 +68,7 @@ export async function POST(
       return NextResponse.json({ error: 'Message content is required' }, { status: 400 })
     }
 
-    // Verify user is part of this partnership
+    // Verify user is part of this partnership and get user details
     const partnership = await prisma.partnership.findFirst({
       where: {
         id: params.partnershipId,
@@ -75,12 +77,29 @@ export async function POST(
           { receiverId: session.user.id }
         ],
         status: 'ACTIVE'
+      },
+      include: {
+        initiator: {
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true }
+        },
+        receiver: {
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true }
+        }
       }
     })
 
     if (!partnership) {
       return NextResponse.json({ error: 'Partnership not found or not active' }, { status: 404 })
     }
+
+    // Determine who is the receiver (the other person in the partnership)
+    const receiverId = partnership.initiatorId === session.user.id 
+      ? partnership.receiverId 
+      : partnership.initiatorId
+    
+    const sender = partnership.initiatorId === session.user.id 
+      ? partnership.initiator 
+      : partnership.receiver
 
     // Create the message
     const message = await prisma.message.create({
@@ -96,6 +115,15 @@ export async function POST(
         }
       }
     })
+
+    // Send notification to the receiver
+    try {
+      const senderName = formatUserName(sender)
+      await NotificationHelpers.newMessage(receiverId, senderName, params.partnershipId)
+    } catch (error) {
+      console.error('Failed to send message notification:', error)
+      // Don't fail the message creation if notification fails
+    }
 
     return NextResponse.json({ message }, { status: 201 })
 

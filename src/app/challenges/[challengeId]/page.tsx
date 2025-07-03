@@ -68,16 +68,17 @@ export default async function ChallengePage({ params }: PageProps) {
   const userCompletion = challenge.completions.find((c: any) => c.userId === session.user.id)
   const buddyCompletion = challenge.completions.find((c: any) => c.userId === buddy.id)
 
-  const isOverdue = new Date() > new Date(challenge.dueDate)
-  const daysLeft = Math.ceil((new Date(challenge.dueDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
-  
-  // Check if challenge is due today (can only complete today or overdue challenges)
-  const today = new Date()
+  // Simplified date logic - no "overdue" concept
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const challengeDueDate = new Date(challenge.dueDate)
-  today.setHours(0, 0, 0, 0)
-  challengeDueDate.setHours(0, 0, 0, 0)
-  const isFutureChallenge = challengeDueDate > today
-  const canComplete = !isFutureChallenge
+  const challengeDateStart = new Date(challengeDueDate.getFullYear(), challengeDueDate.getMonth(), challengeDueDate.getDate())
+  
+  const isFutureChallenge = challengeDateStart > todayStart
+  const canComplete = !isFutureChallenge // Can complete today or past challenges
+  
+  // Calculate days relative to today for display
+  const daysDiff = Math.ceil((challengeDateStart.getTime() - todayStart.getTime()) / (1000 * 3600 * 24))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,15 +111,14 @@ export default async function ChallengePage({ params }: PageProps) {
                 {isFutureChallenge ? "Tomorrow's Goal" : "Today's Goal"}
               </h2>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                isOverdue ? 'bg-red-100 text-red-700' :
                 isFutureChallenge ? 'bg-blue-100 text-blue-700' :
-                daysLeft === 0 ? 'bg-yellow-100 text-yellow-700' :
+                daysDiff === 0 ? 'bg-yellow-100 text-yellow-700' :
                 'bg-green-100 text-green-700'
               }`}>
-                {isOverdue ? 'Overdue' : 
-                 isFutureChallenge ? `Due ${challengeDueDate.toLocaleDateString()}` :
-                 daysLeft === 0 ? 'Due Today' : 
-                 `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
+                {isFutureChallenge ? `Due ${challengeDueDate.toLocaleDateString()}` :
+                 daysDiff === 0 ? 'Due Today' : 
+                 daysDiff < 0 ? 'Available to Complete' :
+                 `${daysDiff} day${daysDiff !== 1 ? 's' : ''} left`}
               </div>
             </div>
             
@@ -318,7 +318,7 @@ export default async function ChallengePage({ params }: PageProps) {
             >
               Back to Dashboard
             </a>
-            {isCreator && !isOverdue && (
+            {isCreator && canComplete && (
               <a
                 href={`/habits/${challenge.habit.id}/challenges/new`}
                 className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-center"
