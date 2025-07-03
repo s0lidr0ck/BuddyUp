@@ -52,14 +52,36 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const subscription = await registration.pushManager.getSubscription()
         setIsSubscribed(!!subscription)
 
-        console.log('Service Worker registered successfully')
+        console.log('Service Worker registered successfully for user:', session?.user?.id)
       } catch (error) {
         console.error('Service Worker registration failed:', error)
+        // Don't break the app if service worker fails - notifications just won't work
+        setServiceWorkerReg(null)
+        setIsSubscribed(false)
       }
     }
 
-    setupServiceWorker()
+    // Add a small delay to ensure DOM is ready (helps on mobile)
+    const timeoutId = setTimeout(setupServiceWorker, 100)
+    
+    return () => clearTimeout(timeoutId)
   }, [isSupported, session?.user?.id])
+
+  // Handle page visibility changes (mobile app switching)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && session?.user?.id) {
+        // App became visible again - refresh unread count
+        console.log('App became visible - refreshing notification state')
+        refreshUnreadCount()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [session?.user?.id])
 
   // Get unread notification count
   const refreshUnreadCount = async () => {

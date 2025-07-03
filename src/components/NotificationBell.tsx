@@ -102,22 +102,47 @@ export default function NotificationBell() {
     return date.toLocaleDateString()
   }
 
-  // Debug logging
+  // Debug logging - enhanced for mobile debugging
   console.log('NotificationBell render:', { 
     hasSession: !!session, 
     hasUserId: !!session?.user?.id, 
+    sessionStatus: session ? 'loaded' : 'loading',
     isSupported, 
-    unreadCount 
+    unreadCount,
+    timestamp: new Date().toISOString()
   })
 
-  if (!session?.user?.id) {
-    // Show a loading state instead of nothing
+  // More robust session check - only hide if we're sure there's no session
+  const isSessionLoading = session === undefined
+  const hasValidSession = session?.user?.id
+
+  if (isSessionLoading) {
+    // Show loading state while session is being loaded
+    return (
+      <div className="relative">
+        <button
+          className="relative p-2 text-gray-500 cursor-not-allowed"
+          disabled
+          aria-label="Notifications (loading)"
+        >
+          <div className="w-6 h-6 animate-pulse">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+        </button>
+      </div>
+    )
+  }
+
+  if (!hasValidSession) {
+    // Session loaded but no user - should rarely happen but show a minimal bell
     return (
       <div className="relative">
         <button
           className="relative p-2 text-gray-400 cursor-not-allowed"
           disabled
-          aria-label="Notifications (loading)"
+          aria-label="Notifications (sign in required)"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
