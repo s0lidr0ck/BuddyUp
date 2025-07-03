@@ -15,7 +15,7 @@ interface Notification {
 }
 
 export default function NotificationBell() {
-  const { unreadCount, refreshUnreadCount } = useNotifications()
+  const { unreadCount, refreshUnreadCount, isSupported, permission, isSubscribed, subscribe, unsubscribe } = useNotifications()
   const { data: session } = useSession()
   const [showDropdown, setShowDropdown] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -102,7 +102,30 @@ export default function NotificationBell() {
     return date.toLocaleDateString()
   }
 
-  if (!session?.user?.id) return null
+  // Debug logging
+  console.log('NotificationBell render:', { 
+    hasSession: !!session, 
+    hasUserId: !!session?.user?.id, 
+    isSupported, 
+    unreadCount 
+  })
+
+  if (!session?.user?.id) {
+    // Show a loading state instead of nothing
+    return (
+      <div className="relative">
+        <button
+          className="relative p-2 text-gray-400 cursor-not-allowed"
+          disabled
+          aria-label="Notifications (loading)"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="relative">
@@ -134,6 +157,30 @@ export default function NotificationBell() {
             </div>
             
             <div className="max-h-80 overflow-y-auto">
+              {/* Push Notification Settings */}
+              {isSupported && (
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Push Notifications</h4>
+                      <p className="text-xs text-gray-600">
+                        {isSubscribed ? 'Enabled for this device' : 'Get notified of new messages'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={isSubscribed ? unsubscribe : subscribe}
+                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                        isSubscribed 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                    >
+                      {isSubscribed ? 'Enabled ✓' : 'Enable'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-sm text-gray-500">Loading...</div>
@@ -142,6 +189,11 @@ export default function NotificationBell() {
                 <div className="flex flex-col items-center justify-center py-8">
                   <div className="text-gray-400 text-2xl mb-2">🔔</div>
                   <p className="text-sm text-gray-500">No notifications yet</p>
+                  {isSupported && !isSubscribed && (
+                    <p className="text-xs text-gray-400 mt-2 text-center">
+                      Enable push notifications above to get alerts when you're not on the app
+                    </p>
+                  )}
                 </div>
               ) : (
                 notifications.map((notification) => (

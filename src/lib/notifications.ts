@@ -44,8 +44,16 @@ if (typeof window === 'undefined') {
   // Only import web-push on server side
   try {
     webpush = require('web-push')
+    console.log('web-push imported successfully')
+    console.log('VAPID_PUBLIC_KEY:', VAPID_PUBLIC_KEY ? 'Set' : 'Missing')
+    console.log('VAPID_PRIVATE_KEY:', VAPID_PRIVATE_KEY ? 'Set' : 'Missing')
+    console.log('VAPID_EMAIL:', VAPID_EMAIL)
+    
     if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
       webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+      console.log('VAPID details set successfully')
+    } else {
+      console.warn('Missing VAPID keys - push notifications will not work')
     }
   } catch (error: any) {
     console.warn('web-push not available:', error.message)
@@ -80,8 +88,10 @@ export class NotificationService {
    * Send a push notification to a user
    */
   static async sendPushNotification(userId: string, payload: PushNotificationPayload) {
+    console.log('sendPushNotification called for user:', userId)
+    
     if (!webpush) {
-      console.warn('Web push not configured')
+      console.warn('Web push not configured - webpush object is null')
       return
     }
 
@@ -94,6 +104,8 @@ export class NotificationService {
         },
       })
 
+      console.log('Found', subscriptions.length, 'active subscriptions for user:', userId)
+
       if (subscriptions.length === 0) {
         console.log('No active push subscriptions for user:', userId)
         return
@@ -101,6 +113,8 @@ export class NotificationService {
 
       // Check user's notification preferences
       const preferences = await this.getNotificationPreferences(userId)
+      console.log('User notification preferences:', { pushEnabled: preferences.pushEnabled, newMessages: preferences.newMessages })
+      
       if (!preferences.pushEnabled) {
         console.log('Push notifications disabled for user:', userId)
         return

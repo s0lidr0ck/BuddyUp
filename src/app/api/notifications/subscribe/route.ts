@@ -18,30 +18,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid subscription data' }, { status: 400 })
     }
 
-    // For now, just return success until Prisma client is regenerated
-    // This will be replaced with actual database operations
+    // Save subscription to database
     console.log('Push subscription received for user:', session.user.id)
     
-    /* 
-    When Prisma client is regenerated, use:
-    await prisma.notificationSubscription.upsert({
-      where: { endpoint: subscription.endpoint },
-      update: {
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-        userAgent,
-        isActive: true,
-        lastUsed: new Date(),
-      },
-      create: {
-        userId: session.user.id,
-        endpoint: subscription.endpoint,
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-        userAgent,
-      },
-    })
-    */
+    try {
+      await prisma.notificationSubscription.upsert({
+        where: { endpoint: subscription.endpoint },
+        update: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+          userAgent,
+          isActive: true,
+          lastUsed: new Date(),
+        },
+        create: {
+          userId: session.user.id,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+          userAgent,
+        },
+      })
+      console.log('Successfully saved push subscription to database')
+    } catch (dbError) {
+      console.error('Failed to save subscription to database:', dbError)
+      // Continue anyway - the subscription might still work
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

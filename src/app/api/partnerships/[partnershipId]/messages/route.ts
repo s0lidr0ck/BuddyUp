@@ -119,7 +119,9 @@ export async function POST(
     // Send notification to the receiver
     try {
       const senderName = formatUserName(sender)
+      console.log('Sending notification to user:', receiverId, 'from:', senderName)
       await NotificationHelpers.newMessage(receiverId, senderName, params.partnershipId)
+      console.log('Notification sent successfully')
     } catch (error) {
       console.error('Failed to send message notification:', error)
       // Don't fail the message creation if notification fails
