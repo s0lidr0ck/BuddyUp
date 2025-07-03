@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { formatUserName } from '@/lib/utils'
 import ChatTimeline from './ChatTimeline'
+import NotificationBell from '@/components/NotificationBell'
 
 interface PageProps {
   params: { partnershipId: string }
@@ -93,6 +94,7 @@ export default async function ChatPage({ params }: PageProps) {
             
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
               <span className="text-xs sm:text-sm text-gray-600">🔥 Active</span>
+              <NotificationBell />
             </div>
           </div>
         </div>

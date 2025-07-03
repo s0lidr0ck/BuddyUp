@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { formatUserName } from '@/lib/utils'
 import BuddyManagementClient from './BuddyManagementClient'
+import NotificationBell from '@/components/NotificationBell'
 
 async function getBuddyData(userId: string) {
   const [partnerships, pendingInvites, user] = await Promise.all([
@@ -111,6 +112,7 @@ export default async function BuddiesPage() {
               <span className="text-sm text-gray-600">
                 {data.activePartnerships.length} active buddy{data.activePartnerships.length !== 1 ? 'ies' : 'y'}
               </span>
+              <NotificationBell />
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { formatUserName } from '@/lib/utils'
 import AccountForm from './AccountForm'
 import CopyInviteLink from './CopyInviteLink'
+import NotificationBell from '@/components/NotificationBell'
 
 async function getUserData(userId: string) {
   const [user, partnerships, habitsCreated, challengeCompletions] = await Promise.all([
@@ -106,6 +107,7 @@ export default async function AccountPage() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <NotificationBell />
               {user.profilePicture ? (
                 <img 
                   src={user.profilePicture} 
