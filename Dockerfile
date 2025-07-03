@@ -1,24 +1,13 @@
 # Use Node.js 18 Debian for better Prisma compatibility
 FROM node:18-slim AS base
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm cache clean --force
-
-# Rebuild the source code only when needed
+# Install system dependencies needed for build and runtime
 FROM base AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 WORKDIR /app
 
 # Copy package files and install ALL dependencies (not just production)
@@ -37,11 +26,12 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-# Install OpenSSL for Prisma
+# Install runtime dependencies for Prisma
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 ENV NODE_ENV production
 
