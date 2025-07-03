@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       // Check for new challenge completions
       prisma.challengeCompletion.findMany({
         where: {
-          createdAt: { gte: sinceDate },
+          completedAt: { gte: sinceDate },
           challenge: {
             habit: {
               partnership: {
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        select: { id: true, createdAt: true }
+        select: { id: true, completedAt: true }
       })
     ])
 
