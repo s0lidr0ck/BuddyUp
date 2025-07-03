@@ -25,6 +25,14 @@ export interface PushNotificationPayload {
   data?: Record<string, any>
 }
 
+export interface WebPushSubscription {
+  endpoint: string
+  keys: {
+    p256dh: string
+    auth: string
+  }
+}
+
 // VAPID keys for web push (generate with: npx web-push generate-vapid-keys)
 // In production, these should be stored in environment variables
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || ''
@@ -188,7 +196,7 @@ export class NotificationService {
   /**
    * Subscribe user to push notifications
    */
-  static async subscribeToPush(userId: string, subscription: PushSubscription, userAgent?: string) {
+  static async subscribeToPush(userId: string, subscription: WebPushSubscription, userAgent?: string) {
     try {
       await prisma.notificationSubscription.upsert({
         where: { endpoint: subscription.endpoint },
