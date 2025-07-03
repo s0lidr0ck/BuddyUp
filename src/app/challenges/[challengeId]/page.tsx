@@ -164,22 +164,15 @@ export default async function ChallengePage({ params }: PageProps) {
                     <span className="text-lg mr-2">✅</span>
                     <span className="font-medium">Completed!</span>
                   </div>
-                  {userCompletion.proofText && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-700 mb-1">Your note:</div>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                        {userCompletion.proofText}
-                      </div>
-                    </div>
-                  )}
                   {userCompletion.reflectionNote && (
                     <div>
-                      <div className="text-sm font-medium text-gray-700 mb-1">Your reflection:</div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Your note:</div>
                       <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
                         {userCompletion.reflectionNote}
                       </div>
                     </div>
                   )}
+
                   {userCompletion.feelingTags && (
                     <div>
                       <div className="text-sm font-medium text-gray-700 mb-1">How you felt:</div>
@@ -214,7 +207,7 @@ export default async function ChallengePage({ params }: PageProps) {
                     </div>
                   )}
                   <div className="text-xs text-gray-500">
-                    Completed {new Date(userCompletion.createdAt).toLocaleString()}
+                    Completed {new Date(userCompletion.completedAt).toLocaleString()}
                   </div>
                 </div>
               ) : (
@@ -245,22 +238,15 @@ export default async function ChallengePage({ params }: PageProps) {
                     <span className="text-lg mr-2">✅</span>
                     <span className="font-medium">Completed!</span>
                   </div>
-                  {buddyCompletion.proofText && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-700 mb-1">Their note:</div>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                        {buddyCompletion.proofText}
-                      </div>
-                    </div>
-                  )}
                   {buddyCompletion.reflectionNote && (
                     <div>
-                      <div className="text-sm font-medium text-gray-700 mb-1">Their reflection:</div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Their note:</div>
                       <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
                         {buddyCompletion.reflectionNote}
                       </div>
                     </div>
                   )}
+
                   {buddyCompletion.feelingTags && (
                     <div>
                       <div className="text-sm font-medium text-gray-700 mb-1">How they felt:</div>
@@ -295,7 +281,7 @@ export default async function ChallengePage({ params }: PageProps) {
                     </div>
                   )}
                   <div className="text-xs text-gray-500">
-                    Completed {new Date(buddyCompletion.createdAt).toLocaleString()}
+                    Completed {new Date(buddyCompletion.completedAt).toLocaleString()}
                   </div>
                 </div>
               ) : (
