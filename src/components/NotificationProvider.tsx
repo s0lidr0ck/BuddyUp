@@ -130,24 +130,57 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }
 
   const subscribe = async (): Promise<boolean> => {
+    console.log('🔔 Subscribe button clicked - starting subscription process')
+    
+    // Debug current state
+    console.log('Current state:', {
+      hasServiceWorker: !!serviceWorkerReg,
+      hasSession: !!session?.user?.id,
+      hasVAPID: !!VAPID_PUBLIC_KEY,
+      currentPermission: permission,
+      isSupported,
+      userAgent: navigator.userAgent
+    })
+
     if (!serviceWorkerReg || !session?.user?.id || !VAPID_PUBLIC_KEY) {
-      console.error('Cannot subscribe: missing requirements')
+      const missingReqs = []
+      if (!serviceWorkerReg) missingReqs.push('Service Worker')
+      if (!session?.user?.id) missingReqs.push('User Session')
+      if (!VAPID_PUBLIC_KEY) missingReqs.push('VAPID Key')
+      
+      console.error('❌ Cannot subscribe - missing:', missingReqs.join(', '))
+      addToast(`Setup incomplete: Missing ${missingReqs.join(', ')}`, 'error')
       return false
     }
 
     try {
+      console.log('📋 Checking permission...')
+      
       // Request permission if not granted
       if (permission !== 'granted') {
+        console.log('🔒 Permission not granted, requesting...')
         const granted = await requestPermission()
-        if (!granted) return false
+        if (!granted) {
+          console.log('❌ Permission denied by user')
+          return false
+        }
+        console.log('✅ Permission granted!')
+      } else {
+        console.log('✅ Permission already granted')
       }
 
+      console.log('🔧 Creating push subscription...')
+      
       // Subscribe to push notifications
       const subscription = await serviceWorkerReg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       })
 
+      console.log('✅ Push subscription created:', subscription.endpoint)
+
+      console.log('📡 Sending subscription to server...')
+      
       // Send subscription to server
       const response = await fetch('/api/notifications/subscribe', {
         method: 'POST',
@@ -158,16 +191,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         })
       })
 
+      console.log('📡 Server response status:', response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log('✅ Server saved subscription successfully:', result)
         setIsSubscribed(true)
         addToast('Successfully subscribed to push notifications! 🎉', 'success')
         return true
       } else {
-        throw new Error('Failed to save subscription on server')
+        const error = await response.text()
+        console.error('❌ Server error:', response.status, error)
+        throw new Error(`Server error: ${response.status} - ${error}`)
       }
     } catch (error) {
-      console.error('Failed to subscribe to push notifications:', error)
-      addToast('Failed to subscribe to push notifications', 'error')
+      console.error('❌ Subscription failed:', error)
+      
+      // More specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('denied')) {
+          addToast('Push notifications were blocked. Check your browser settings.', 'warning')
+        } else if (error.message.includes('not supported')) {
+          addToast('Push notifications are not supported on this browser.', 'error')
+        } else if (error.message.includes('Server error')) {
+          addToast('Server error - please try again later.', 'error')
+        } else {
+          addToast(`Failed to enable notifications: ${error.message}`, 'error')
+        }
+      } else {
+        addToast('Failed to enable push notifications', 'error')
+      }
+      
       return false
     }
   }
