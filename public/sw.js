@@ -41,13 +41,33 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
+  // Skip caching for API routes and external URLs
+  if (event.request.url.includes('/api/') || !event.request.url.startsWith(self.location.origin)) {
+    return
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
         // Return cached version or fetch from network
-        return response || fetch(event.request)
-      }
-    )
+        return response || fetch(event.request).catch(() => {
+          // If network fails, try to return a fallback for navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match('/')
+          }
+          throw new Error('Network error and no cache available')
+        })
+      })
+      .catch((error) => {
+        console.log('Service Worker fetch error:', error)
+        // Return a basic response for navigation requests when everything fails
+        if (event.request.mode === 'navigate') {
+          return new Response('App is offline. Please check your connection.', {
+            headers: { 'Content-Type': 'text/html' }
+          })
+        }
+        return Response.error()
+      })
   )
 })
 
